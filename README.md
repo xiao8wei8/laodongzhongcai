@@ -81,7 +81,7 @@ DB_ENV=development
 MONGO_URI_DEV=mongodb://localhost:27017/laodong
 
 # 生产环境数据库配置
-MONGO_URI_PROD=mongodb://152.136.175.14:27017/laodong
+MONGO_URI_PROD=mongodb://your-production-mongodb-server:27017/laodong
 
 # JWT配置
 JWT_SECRET=your_jwt_secret_key
@@ -181,7 +181,7 @@ npm run backup
 
 ### 环境切换
 - **开发环境**：使用本地MongoDB (`localhost:27017/laodong`)
-- **生产环境**：使用远程MongoDB (`152.136.175.14:27017`)
+- **生产环境**：使用远程MongoDB (`your-production-mongodb-server:27017`)
 
 通过环境变量 `DB_ENV` 切换数据库环境。
 

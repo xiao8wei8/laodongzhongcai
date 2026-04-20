@@ -1,0 +1,88 @@
+/* 全局样式重置 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  background-color: #f0f2f5;
+  min-height: 100vh;
+}
+
+/* 响应式设计全局规则 */
+@media (max-width: 768px) {
+  .ant-card {
+    margin-bottom: 16px;
+  }
+  
+  .ant-form-item {
+    margin-bottom: 16px;
+  }
+  
+  .ant-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .ant-layout-content {
+    padding: 16px !important;
+  }
+  
+  h2 {
+    font-size: 18px;
+  }
+  
+  .ant-statistic-title {
+    font-size: 14px;
+  }
+}
+
+/* 表格响应式调整 */
+.ant-table {
+  overflow-x: auto;
+}
+
+/* 确保内容区域在移动设备上有适当的内边距 */
+.content-wrapper {
+  padding: 24px;
+  background-color: white;
+  border-radius: 8px;
+  min-height: calc(100vh - 120px);
+}
+
+@media (max-width: 768px) {
+  .content-wrapper {
+    padding: 16px;
+    min-height: calc(100vh - 100px);
+  }
+}
+
+/* 链接样式 */
+a {
+  color: #1890ff;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #40a9ff;
+  text-decoration: underline;
+}
+
+/* 确保表单元素在移动设备上有适当的宽度 */
+.ant-input,
+.ant-select,
+.ant-cascader-picker,
+.ant-picker {
+  width: 100%;
+}
+
+/* 确保卡片在移动设备上有适当的边距 */
+.ant-card {
+  margin-bottom: 24px;
+}

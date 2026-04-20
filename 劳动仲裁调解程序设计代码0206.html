@@ -1,0 +1,3756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>劳动仲裁调解系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --primary-light: #4895ef;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --warning: #f72585;
+            --danger: #f72585;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --gray-light: #e9ecef;
+            --border-radius: 12px;
+            --box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            --box-shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #f5f7ff;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .login-container {
+            max-width: 420px;
+            margin: 100px auto;
+            padding: 40px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .login-container:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-icon {
+            background: linear-gradient(135deg, var(--primary), var(--success));
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 30px;
+        }
+        
+        .login-header h2 {
+            color: var(--dark);
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .login-header p {
+            color: var(--gray);
+            font-size: 0.95rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--dark);
+            font-size: 0.9rem;
+        }
+        
+        .form-control, .form-select {
+            padding: 12px 15px;
+            border: 1px solid #e0e5f1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.2);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        .btn-outline-primary {
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .demo-accounts {
+            background-color: #f8f9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 25px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .demo-accounts p {
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+        
+        /* 主系统样式 */
+        .main-container {
+            display: none;
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, #2a2d43 0%, #1c1e2e 100%);
+            color: white;
+            min-height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+            transition: var(--transition);
+        }
+        
+        .sidebar-header {
+            padding: 25px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-header i {
+            font-size: 24px;
+            color: var(--success);
+            margin-right: 12px;
+        }
+        
+        .sidebar-header h4 {
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin: 0;
+        }
+        
+        .sidebar-menu {
+            padding: 20px 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 12px 20px;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-link i {
+            font-size: 18px;
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-left-color: var(--success);
+        }
+        
+        .sidebar-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--success));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 12px;
+        }
+        
+        .user-details h6 {
+            margin-bottom: 2px;
+            font-weight: 600;
+        }
+        
+        .user-details small {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.8rem;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 25px;
+            min-height: 100vh;
+            transition: var(--transition);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        .page-title {
+            display: flex;
+            align-items: center;
+        }
+        
+        .page-title i {
+            font-size: 28px;
+            color: var(--primary);
+            margin-right: 15px;
+            background-color: rgba(67, 97, 238, 0.1);
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .page-title h2 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .page-title p {
+            color: var(--gray);
+            font-size: 0.95rem;
+            margin: 0;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 25px;
+            box-shadow: var(--box-shadow-light);
+            transition: var(--transition);
+            border-top: 4px solid var(--primary);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .stat-card.success {
+            border-top-color: #4cc9f0;
+        }
+        
+        .stat-card.warning {
+            border-top-color: #f72585;
+        }
+        
+        .stat-card.info {
+            border-top-color: #3f37c9;
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card:nth-child(1) .stat-icon {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+        
+        .stat-card:nth-child(2) .stat-icon {
+            background-color: rgba(76, 201, 240, 0.1);
+            color: var(--success);
+        }
+        
+        .stat-card:nth-child(3) .stat-icon {
+            background-color: rgba(247, 37, 133, 0.1);
+            color: var(--warning);
+        }
+        
+        .stat-card:nth-child(4) .stat-icon {
+            background-color: rgba(63, 55, 201, 0.1);
+            color: var(--secondary);
+        }
+        
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .stat-trend {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .stat-trend.up {
+            color: #28a745;
+        }
+        
+        .stat-trend.down {
+            color: #dc3545;
+        }
+        
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow-light);
+            margin-bottom: 25px;
+            transition: var(--transition);
+        }
+        
+        .card:hover {
+            box-shadow: var(--box-shadow);
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 20px 25px;
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h5 {
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .card-header h5 i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 25px;
+        }
+        
+        .table {
+            margin-bottom: 0;
+        }
+        
+        .table thead th {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 0.9rem;
+            padding: 15px;
+        }
+        
+        .table tbody td {
+            padding: 15px;
+            vertical-align: middle;
+            border-top: 1px solid rgba(0, 0, 0, 0.03);
+        }
+        
+        .table tbody tr:hover {
+            background-color: rgba(67, 97, 238, 0.02);
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        
+        .badge-primary {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+        
+        .badge-success {
+            background-color: rgba(76, 201, 240, 0.1);
+            color: #4cc9f0;
+        }
+        
+        .badge-warning {
+            background-color: rgba(247, 37, 133, 0.1);
+            color: #f72585;
+        }
+        
+        .badge-info {
+            background-color: rgba(63, 55, 201, 0.1);
+            color: var(--secondary);
+        }
+        
+        .search-box {
+            position: relative;
+            max-width: 300px;
+        }
+        
+        .search-box input {
+            padding-left: 40px;
+            border-radius: 8px;
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray);
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .alert-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .alert-info {
+            background-color: rgba(23, 162, 184, 0.1);
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .step-progress {
+            display: flex;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .step-progress:before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--gray-light);
+            z-index: 1;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: white;
+            border: 2px solid var(--gray-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--gray);
+            margin: 0 auto 10px;
+            transition: var(--transition);
+        }
+        
+        .step.active .step-number {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(67, 97, 238, 0.3);
+        }
+        
+        .step.completed .step-number {
+            background-color: var(--success);
+            border-color: var(--success);
+            color: white;
+        }
+        
+        .step-label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+        
+        .step.active .step-label {
+            color: var(--primary);
+        }
+        
+        .form-section {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: var(--box-shadow-light);
+            margin-bottom: 30px;
+        }
+        
+        .form-section h5 {
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--gray-light);
+            color: var(--dark);
+        }
+        
+        .visitor-card {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--box-shadow-light);
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary);
+            transition: var(--transition);
+        }
+        
+        .visitor-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        
+        .timeline:before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: var(--gray-light);
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-bottom: 30px;
+        }
+        
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            left: -26px;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: white;
+            border: 3px solid var(--gray-light);
+            z-index: 2;
+        }
+        
+        .timeline-item.completed .timeline-marker {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+        
+        .timeline-item.current .timeline-marker {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 5px rgba(67, 97, 238, 0.1);
+        }
+        
+        .timeline-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .timeline-date {
+            font-size: 0.85rem;
+            color: var(--gray);
+            margin-bottom: 5px;
+        }
+        
+        .evidence-list .evidence-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .evidence-list .evidence-item:last-child {
+            border-bottom: none;
+        }
+        
+        .evidence-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .evidence-icon.pdf {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+        
+        .evidence-icon.image {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+        
+        .evidence-icon.word {
+            background-color: rgba(23, 162, 184, 0.1);
+            color: #17a2b8;
+        }
+        
+        .evidence-info {
+            flex: 1;
+        }
+        
+        .evidence-info h6 {
+            font-size: 0.95rem;
+            margin-bottom: 2px;
+        }
+        
+        .evidence-info small {
+            color: var(--gray);
+            font-size: 0.8rem;
+        }
+        
+        .modal-content {
+            border-radius: var(--border-radius);
+            border: none;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 20px 25px;
+        }
+        
+        .modal-title {
+            font-weight: 700;
+        }
+        
+        .modal-body {
+            padding: 25px;
+        }
+        
+        .pagination .page-link {
+            border: none;
+            color: var(--dark);
+            padding: 8px 15px;
+            margin: 0 3px;
+            border-radius: 6px;
+            transition: var(--transition);
+        }
+        
+        .pagination .page-link:hover {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .role-selector {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .role-option {
+            flex: 1;
+            text-align: center;
+            padding: 25px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow-light);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+        
+        .role-option:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--box-shadow);
+            border-color: var(--primary-light);
+        }
+        
+        .role-option.selected {
+            border-color: var(--primary);
+            background-color: rgba(67, 97, 238, 0.03);
+        }
+        
+        .role-option i {
+            font-size: 40px;
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+        
+        .role-option h5 {
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .role-option p {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        /* 广播消息样式 */
+        .broadcast-message {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--box-shadow-light);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .broadcast-message.important {
+            border-left-color: var(--warning);
+        }
+        
+        .broadcast-message.emergency {
+            border-left-color: var(--danger);
+            background-color: rgba(220, 53, 69, 0.03);
+        }
+        
+        .broadcast-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .broadcast-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+        
+        .broadcast-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        
+        .broadcast-type {
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .broadcast-type.handover {
+            background-color: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+        }
+        
+        .broadcast-type.special {
+            background-color: rgba(247, 37, 133, 0.1);
+            color: var(--warning);
+        }
+        
+        .broadcast-type.notice {
+            background-color: rgba(76, 201, 240, 0.1);
+            color: var(--success);
+        }
+        
+        .broadcast-type.policy {
+            background-color: rgba(63, 55, 201, 0.1);
+            color: var(--secondary);
+        }
+        
+        .broadcast-content {
+            color: var(--dark);
+            line-height: 1.7;
+        }
+        
+        .broadcast-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        /* 案件查询结果样式 */
+        .query-result-item {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: var(--box-shadow-light);
+            border: 1px solid var(--gray-light);
+            transition: var(--transition);
+        }
+        
+        .query-result-item:hover {
+            box-shadow: var(--box-shadow);
+            border-color: var(--primary-light);
+        }
+        
+        .query-result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .query-result-title {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--dark);
+        }
+        
+        .query-result-meta {
+            display: flex;
+            gap: 15px;
+            color: var(--gray);
+            font-size: 0.85rem;
+        }
+        
+        .query-result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .query-detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .query-detail-label {
+            font-size: 0.8rem;
+            color: var(--gray);
+            margin-bottom: 3px;
+        }
+        
+        .query-detail-value {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow-light);
+        }
+        
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 70px;
+                overflow: hidden;
+            }
+            
+            .sidebar-header h4, .user-details, .nav-link span {
+                display: none;
+            }
+            
+            .nav-link {
+                justify-content: center;
+                padding: 15px;
+            }
+            
+            .nav-link i {
+                margin-right: 0;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+            }
+            
+            .page-title h2 {
+                font-size: 1.5rem;
+            }
+            
+            .role-selector {
+                flex-direction: column;
+            }
+            
+            .broadcast-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .query-result-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .main-content {
+                padding: 20px 15px;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .page-header .btn-group {
+                margin-top: 15px;
+            }
+            
+            .query-result-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="login-page" class="login-container">
+        <div class="login-header">
+            <div class="login-icon">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <h2>劳动仲裁调解系统</h2>
+            <p>街道劳动人事争议调解中心</p>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">登录身份</label>
+            <select id="login-role" class="form-select">
+                <option value="">请选择登录身份</option>
+                <option value="mediator">调解员账号</option>
+                <option value="admin">管理员账号</option>
+                <option value="personal">个人账号</option>
+                <option value="company">企业账号</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">用户名</label>
+            <input type="text" id="login-username" class="form-control" placeholder="请输入用户名">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">密码</label>
+            <input type="password" id="login-password" class="form-control" placeholder="请输入密码">
+        </div>
+        
+        <div class="form-group">
+            <button id="login-btn" class="btn btn-primary w-100">登录系统</button>
+        </div>
+        
+        <div class="demo-accounts">
+            <p><strong>演示账号：</strong></p>
+            <p>调解员：mediator01 / 123456</p>
+            <p>管理员：admin / 123456</p>
+            <p>个人用户：user01 / 123456</p>
+            <p>企业用户：company01 / 123456</p>
+        </div>
+    </div>
+    
+    <!-- 主系统页面 -->
+    <div id="main-system" class="main-container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-balance-scale"></i>
+                <h4>调解系统</h4>
+            </div>
+            
+            <div class="sidebar-menu">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-page="dashboard">
+                            <i class="fas fa-home"></i>
+                            <span>工作台</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mediator-only">
+                        <a class="nav-link" href="#" data-page="visitor-register">
+                            <i class="fas fa-clipboard-list"></i>
+                            <span>到访登记</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="case-query">
+                            <i class="fas fa-search"></i>
+                            <span>案件查询</span>
+                        </a>
+                    </li>
+                    <li class="nav-item personal-only company-only">
+                        <a class="nav-link" href="#" data-page="case-apply">
+                            <i class="fas fa-file-alt"></i>
+                            <span>申请调解</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mediator-only admin-only">
+                        <a class="nav-link" href="#" data-page="case-management">
+                            <i class="fas fa-gavel"></i>
+                            <span>案件管理</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mediator-only">
+                        <a class="nav-link" href="#" data-page="my-cases">
+                            <i class="fas fa-list"></i>
+                            <span>我的案件</span>
+                        </a>
+                    </li>
+                    <li class="nav-item admin-only">
+                        <a class="nav-link" href="#" data-page="all-cases">
+                            <i class="fas fa-database"></i>
+                            <span>所有案件</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mediator-only admin-only">
+                        <a class="nav-link" href="#" data-page="broadcast">
+                            <i class="fas fa-bullhorn"></i>
+                            <span>站内广播</span>
+                        </a>
+                    </li>
+                    <li class="nav-item mediator-only admin-only">
+                        <a class="nav-link" href="#" data-page="mediator-analysis">
+                            <i class="fas fa-chart-bar"></i>
+                            <span>调解员分析</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="address-book">
+                            <i class="fas fa-address-book"></i>
+                            <span>通讯录</span>
+                        </a>
+                    </li>
+                    <li class="nav-item admin-only">
+                        <a class="nav-link" href="#" data-page="user-management">
+                            <i class="fas fa-users-cog"></i>
+                            <span>用户管理</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="settings">
+                            <i class="fas fa-cog"></i>
+                            <span>系统设置</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">李</div>
+                    <div class="user-details">
+                        <h6 id="current-user-name">李四</h6>
+                        <small id="current-user-role">调解员</small>
+                    </div>
+                    <button id="logout-btn" class="btn btn-sm btn-outline-light ms-auto">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 工作台页面 -->
+            <div id="dashboard-page" class="page-content">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-home"></i>
+                        <div>
+                            <h2>工作台</h2>
+                            <p>欢迎使用劳动仲裁调解系统</p>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-sync-alt me-2"></i>刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 调解员工作台 -->
+                <div id="mediator-dashboard">
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-folder-open"></i>
+                            </div>
+                            <div class="stat-value" id="total-cases">12</div>
+                            <div class="stat-label">总收案数</div>
+                            <div class="stat-trend up">
+                                <i class="fas fa-arrow-up me-1"></i>本月新增3件
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-value" id="success-cases">8</div>
+                            <div class="stat-label">调解成功</div>
+                            <div class="stat-trend up">
+                                <i class="fas fa-arrow-up me-1"></i>成功率66.7%
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card warning">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-value" id="pending-cases">3</div>
+                            <div class="stat-label">调解中</div>
+                            <div class="stat-trend down">
+                                <i class="fas fa-exclamation-circle me-1"></i>需处理2件
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card info">
+                            <div class="stat-icon">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="stat-value" id="failed-cases">1</div>
+                            <div class="stat-label">调解失败</div>
+                            <div class="stat-trend">
+                                <i class="fas fa-minus me-1"></i>失败率8.3%
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-tasks me-2"></i>我的待办案件</h5>
+                                    <div class="search-box">
+                                        <i class="fas fa-search"></i>
+                                        <input type="text" class="form-control" placeholder="搜索案件...">
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>案件编号</th>
+                                                    <th>申请人</th>
+                                                    <th>被申请人</th>
+                                                    <th>申请日期</th>
+                                                    <th>状态</th>
+                                                    <th>操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="my-pending-cases">
+                                                <!-- 数据动态加载 -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-4">
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-exclamation-triangle me-2"></i>即将超期案件</h6>
+                                <p class="mb-2">案件 LA202305001 已受理14天，需确认双方调解意向</p>
+                                <button class="btn btn-sm btn-danger">立即处理</button>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-calendar-alt me-2"></i>今日调解安排</h6>
+                                <p class="mb-0">今天下午14:30与李四进行线上调解会议</p>
+                            </div>
+                            
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-bell me-2"></i>系统通知</h6>
+                                <p class="mb-0">您有2个案件需要上传调解笔录</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 个人/企业工作台 -->
+                <div id="user-dashboard" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-file-alt me-2"></i>我的调解申请</h5>
+                            <button class="btn btn-primary" data-page="case-apply">
+                                <i class="fas fa-plus me-2"></i>新调解申请
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>案件编号</th>
+                                            <th>争议类别</th>
+                                            <th>被申请人</th>
+                                            <th>申请日期</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="user-cases">
+                                        <!-- 数据动态加载 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 管理员工作台 -->
+                <div id="admin-dashboard" style="display: none;">
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="stat-value">42</div>
+                            <div class="stat-label">总案件数</div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-value">5</div>
+                            <div class="stat-label">调解员数量</div>
+                        </div>
+                        
+                        <div class="stat-card warning">
+                            <div class="stat-value">32</div>
+                            <div class="stat-label">成功调解</div>
+                        </div>
+                        
+                        <div class="stat-card info">
+                            <div class="stat-value">6</div>
+                            <div class="stat-label">进行中案件</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line me-2"></i>系统概览</h5>
+                            <button class="btn btn-outline-primary" data-page="mediator-analysis">
+                                <i class="fas fa-chart-bar me-2"></i>详细分析
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <p>系统运行正常，今日有3个新到访登记，2个新调解申请。</p>
+                            <p>最近7天调解成功率：<strong>78.5%</strong></p>
+                            <p>平均调解周期：<strong>12.3天</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 站内广播页面 -->
+            <div id="broadcast-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-bullhorn"></i>
+                        <div>
+                            <h2>站内广播</h2>
+                            <p>值班交接通报、重要事项提醒、紧急工作通知</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="new-broadcast-btn">
+                        <i class="fas fa-plus me-2"></i>发布广播
+                    </button>
+                </div>
+                
+                <!-- 广播列表 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list me-2"></i>广播列表</h5>
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="form-control" placeholder="搜索广播内容..." id="broadcast-search">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="broadcast-list">
+                            <!-- 广播消息将通过JS动态加载 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 发布广播表单 -->
+                <div class="card" id="broadcast-form-container" style="display: none;">
+                    <div class="card-header">
+                        <h5><i class="fas fa-edit me-2"></i>发布广播</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="broadcast-form">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">广播标题 *</label>
+                                    <input type="text" class="form-control" id="broadcast-title" required placeholder="请输入广播标题">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">广播类型 *</label>
+                                    <select class="form-select" id="broadcast-type" required>
+                                        <option value="">请选择广播类型</option>
+                                        <option value="handover">值班交接</option>
+                                        <option value="special">特殊案件</option>
+                                        <option value="notice">工作通知</option>
+                                        <option value="policy">政策变更</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">广播内容 *</label>
+                                <textarea class="form-control" id="broadcast-content" rows="6" required placeholder="请输入广播内容..."></textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">紧急程度</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="urgency" id="urgency-normal" value="normal" checked>
+                                    <label class="form-check-label" for="urgency-normal">普通</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="urgency" id="urgency-important" value="important">
+                                    <label class="form-check-label" for="urgency-important">重要</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="urgency" id="urgency-emergency" value="emergency">
+                                    <label class="form-check-label" for="urgency-emergency">紧急</label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="broadcast-need-review">
+                                    <label class="form-check-label" for="broadcast-need-review">
+                                        需要管理员审核（勾选后广播将进入"待审核"状态）
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button type="button" class="btn btn-outline-secondary" id="cancel-broadcast-btn">
+                                    取消
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    提交广播
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 案件查询页面 -->
+            <div id="case-query-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-search"></i>
+                        <div>
+                            <h2>案件查询</h2>
+                            <p>通过当事人姓名查询案件基本信息</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-search me-2"></i>案件查询</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="input-group mb-3">
+                                    <input type="text" class="form-control" id="case-query-input" placeholder="请输入申请人或被申请人姓名进行查询">
+                                    <button class="btn btn-primary" type="button" id="case-query-btn">
+                                        <i class="fas fa-search me-2"></i>查询
+                                    </button>
+                                </div>
+                                <small class="text-muted">提示：只能通过当事人姓名进行检索，查询结果仅显示基本信息</small>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-grid">
+                                    <button class="btn btn-outline-primary" id="quick-register-btn" data-page="case-apply">
+                                        <i class="fas fa-plus-circle me-2"></i>快速登记新案件
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list-alt me-2"></i>查询结果</h5>
+                        <div id="query-result-count" class="text-muted">请输入查询条件</div>
+                    </div>
+                    <div class="card-body">
+                        <div id="query-results">
+                            <!-- 查询结果将通过JS动态加载 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 到访登记页面 -->
+            <div id="visitor-register-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-clipboard-list"></i>
+                        <div>
+                            <h2>到访登记</h2>
+                            <p>记录每日到访/来电信息，生成登记编号并发送短信链接</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h5><i class="fas fa-user-plus me-2"></i>新增到访记录</h5>
+                    <form id="visitor-form">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">来访者姓名 *</label>
+                                <input type="text" class="form-control" id="visitor-name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">联系方式 *</label>
+                                <input type="tel" class="form-control" id="visitor-phone" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">来访类型</label>
+                                <select class="form-select" id="visitor-type">
+                                    <option value="visit">现场到访</option>
+                                    <option value="phone">电话咨询</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">登记日期</label>
+                                <input type="date" class="form-control" id="register-date" value="2023-06-15">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">争议类别</label>
+                            <select class="form-select" id="dispute-type">
+                                <option value="">请选择争议类别</option>
+                                <option value="labor_payment">劳动报酬</option>
+                                <option value="work_injury">工伤保险</option>
+                                <option value="pension">养老保险</option>
+                                <option value="termination">解除和终止合同</option>
+                                <option value="compensation">经济补偿金或赔偿金</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">事由描述 *</label>
+                            <textarea class="form-control" id="visitor-reason" rows="3" required placeholder="请简要描述争议事由..."></textarea>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button type="button" class="btn btn-outline-secondary" id="save-draft">
+                                <i class="fas fa-save me-2"></i>暂存
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>生成登记编号并发送短信
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-history me-2"></i>今日到访记录</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>登记编号</th>
+                                        <th>来访者</th>
+                                        <th>联系方式</th>
+                                        <th>争议类别</th>
+                                        <th>登记时间</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="visitor-records">
+                                    <!-- 到访记录数据将通过JS动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 申请调解页面 -->
+            <div id="case-apply-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-file-alt"></i>
+                        <div>
+                            <h2>申请调解</h2>
+                            <p>填写劳动仲裁调解申请信息</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step-progress">
+                    <div class="step active" id="step1">
+                        <div class="step-number">1</div>
+                        <div class="step-label">身份选择</div>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-number">2</div>
+                        <div class="step-label">基本信息</div>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-number">3</div>
+                        <div class="step-label">调解请求</div>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-number">4</div>
+                        <div class="step-label">提交完成</div>
+                    </div>
+                </div>
+                
+                <!-- 步骤1: 身份选择 -->
+                <div id="apply-step1" class="apply-step">
+                    <div class="form-section">
+                        <h5><i class="fas fa-user-tag me-2"></i>选择身份</h5>
+                        <p class="mb-4">请选择您在本案中的身份</p>
+                        
+                        <div class="role-selector">
+                            <div class="role-option selected" id="select-applicant">
+                                <i class="fas fa-user"></i>
+                                <h5>申请人</h5>
+                                <p>提起劳动仲裁调解请求的一方</p>
+                            </div>
+                            <div class="role-option" id="select-respondent">
+                                <i class="fas fa-building"></i>
+                                <h5>被申请人</h5>
+                                <p>被提起劳动仲裁调解的一方</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 text-center">
+                            <p class="text-muted mb-3">如果您是收到短信链接来完善信息的，请直接点击下一步</p>
+                            <button class="btn btn-primary" id="apply-next1">
+                                下一步 <i class="fas fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 步骤2: 基本信息 -->
+                <div id="apply-step2" class="apply-step" style="display: none;">
+                    <div class="form-section">
+                        <h5><i class="fas fa-info-circle me-2"></i>基本信息填写</h5>
+                        <form id="basic-info-form">
+                            <div class="mb-4">
+                                <h6 class="border-bottom pb-2 mb-3">申请人信息</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">姓名/名称 *</label>
+                                        <input type="text" class="form-control" id="applicant-name" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">身份证号/统一社会信用代码 *</label>
+                                        <input type="text" class="form-control" id="applicant-id" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">联系电话 *</label>
+                                        <input type="tel" class="form-control" id="applicant-phone" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">电子邮箱</label>
+                                        <input type="email" class="form-control" id="applicant-email">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">送达地址 *</label>
+                                    <textarea class="form-control" id="applicant-address" rows="2" required></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6 class="border-bottom pb-2 mb-3">被申请人信息</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">单位名称/姓名 *</label>
+                                        <input type="text" class="form-control" id="respondent-name" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">统一社会信用代码/身份证号</label>
+                                        <input type="text" class="form-control" id="respondent-id">
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">法定代表人/负责人</label>
+                                        <input type="text" class="form-control" id="respondent-legal-person">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">联系电话</label>
+                                        <input type="tel" class="form-control" id="respondent-phone">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label">送达地址 *</label>
+                                    <textarea class="form-control" id="respondent-address" rows="2" required></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button type="button" class="btn btn-outline-secondary" id="apply-back2">
+                                    <i class="fas fa-arrow-left me-2"></i>上一步
+                                </button>
+                                <button type="button" class="btn btn-primary" id="apply-next2">
+                                    下一步 <i class="fas fa-arrow-right ms-2"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 步骤3: 调解请求 -->
+                <div id="apply-step3" class="apply-step" style="display: none;">
+                    <div class="form-section">
+                        <h5><i class="fas fa-gavel me-2"></i>调解请求</h5>
+                        <form id="request-form">
+                            <div class="mb-3">
+                                <label class="form-label">争议类别 *</label>
+                                <select class="form-select" id="dispute-category" required>
+                                    <option value="">请选择争议类别</option>
+                                    <option value="labor_payment">劳动报酬</option>
+                                    <option value="work_injury">工伤保险</option>
+                                    <option value="pension">养老保险</option>
+                                    <option value="termination">解除和终止合同</option>
+                                    <option value="compensation">经济补偿金或赔偿金</option>
+                                    <option value="contract_fulfillment">履行聘用合同</option>
+                                    <option value="personnel_relationship">解除人事关系</option>
+                                    <option value="social_security">转移档案和社会保险关系</option>
+                                    <option value="labor_dispatch">劳务派遣</option>
+                                    <option value="working_years">工作年限及休假</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">涉案金额（元）</label>
+                                <input type="number" class="form-control" id="case-amount" min="0" step="0.01">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">请求事项 *</label>
+                                <textarea class="form-control" id="request-items" rows="3" required placeholder="请明确列出您的调解请求..."></textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">事实与理由 *</label>
+                                <textarea class="form-control" id="facts-reasons" rows="5" required placeholder="请详细描述争议事实、理由及相关证据..."></textarea>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button type="button" class="btn btn-outline-secondary" id="apply-back3">
+                                    <i class="fas fa-arrow-left me-2"></i>上一步
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    提交申请 <i class="fas fa-check ms-2"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- 步骤4: 提交完成 -->
+                <div id="apply-step4" class="apply-step" style="display: none;">
+                    <div class="form-section text-center">
+                        <div class="mb-4">
+                            <i class="fas fa-check-circle fa-5x text-success"></i>
+                        </div>
+                        <h3 class="mb-3">申请提交成功！</h3>
+                        <p class="mb-2">您的调解申请已成功提交，案件编号为：</p>
+                        <h4 class="text-primary mb-4" id="case-number-display">LA20230615001</h4>
+                        <p class="text-muted mb-4">系统已自动分配调解员，您可以在"我的调解申请"中查看案件进度。</p>
+                        <div class="action-buttons justify-content-center">
+                            <button class="btn btn-outline-primary" data-page="dashboard">
+                                <i class="fas fa-home me-2"></i>返回工作台
+                            </button>
+                            <button class="btn btn-primary" data-page="case-management">
+                                <i class="fas fa-gavel me-2"></i>查看案件详情
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 案件管理页面 -->
+            <div id="case-management-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-gavel"></i>
+                        <div>
+                            <h2>案件管理</h2>
+                            <p id="case-info">案件编号: LA20230615001 | 申请人: 张三 | 被申请人: 某科技有限公司</p>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-primary" id="export-case-btn">
+                            <i class="fas fa-file-pdf me-2"></i>导出卷宗
+                        </button>
+                        <button class="btn btn-primary" id="ai-analysis-btn">
+                            <i class="fas fa-robot me-2"></i>AI分析报告
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-stream me-2"></i>案件时间轴</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="timeline">
+                                    <div class="timeline-item completed">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <div class="timeline-date">2023-06-01</div>
+                                            <h6>案件登记</h6>
+                                            <p class="mb-0">申请人张三通过到访登记方式提交调解申请，争议类别：劳动报酬。</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item completed">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <div class="timeline-date">2023-06-02</div>
+                                            <h6>案件受理</h6>
+                                            <p class="mb-0">调解员李四受理案件，已向双方发送受理通知书。</p>
+                                            <button class="btn btn-sm btn-outline-primary mt-2">查看受理审批表</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item current">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <div class="timeline-date">2023-06-10</div>
+                                            <h6>调解进展</h6>
+                                            <p class="mb-0">已组织第一次线上调解会议，双方就部分争议点达成一致。</p>
+                                            <div class="mt-2">
+                                                <button class="btn btn-sm btn-outline-primary">查看调解笔录</button>
+                                                <button class="btn btn-sm btn-outline-secondary ms-2">查看会议录像</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker"></div>
+                                        <div class="timeline-content">
+                                            <div class="timeline-date">待完成</div>
+                                            <h6>结案</h6>
+                                            <p class="mb-0">案件正在调解中，预计2023-06-20前结案。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h6>添加记录</h6>
+                                    <div class="input-group mb-3">
+                                        <input type="text" class="form-control" placeholder="记录案件进展...">
+                                        <button class="btn btn-outline-primary" type="button">
+                                            <i class="fas fa-plus"></i> 记一笔
+                                        </button>
+                                    </div>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-upload me-1"></i>上传文件
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-calendar-plus me-1"></i>添加日程
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-bell me-1"></i>设置提醒
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-file-upload me-2"></i>证据材料</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="evidence-list">
+                                    <div class="evidence-item">
+                                        <div class="d-flex align-items-center">
+                                            <div class="evidence-icon pdf">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </div>
+                                            <div class="evidence-info">
+                                                <h6>劳动合同.pdf</h6>
+                                                <small>上传者: 张三 | 2023-06-01</small>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary">查看</button>
+                                        </div>
+                                    </div>
+                                    <div class="evidence-item">
+                                        <div class="d-flex align-items-center">
+                                            <div class="evidence-icon image">
+                                                <i class="fas fa-file-image"></i>
+                                            </div>
+                                            <div class="evidence-info">
+                                                <h6>工资银行流水.jpg</h6>
+                                                <small>上传者: 张三 | 2023-06-01</small>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary">查看</button>
+                                        </div>
+                                    </div>
+                                    <div class="evidence-item">
+                                        <div class="d-flex align-items-center">
+                                            <div class="evidence-icon word">
+                                                <i class="fas fa-file-word"></i>
+                                            </div>
+                                            <div class="evidence-info">
+                                                <h6>解除劳动合同通知书.docx</h6>
+                                                <small>上传者: 某科技有限公司 | 2023-06-03</small>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary">查看</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="action-buttons mt-3">
+                                    <button class="btn btn-outline-primary">
+                                        <i class="fas fa-plus me-2"></i>上传证据材料
+                                    </button>
+                                    <button class="btn btn-outline-primary" id="online-mediation-btn">
+                                        <i class="fas fa-video me-2"></i>发起线上调解会议
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-info-circle me-2"></i>案件基本信息</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td width="40%"><strong>案件编号</strong></td>
+                                        <td>LA20230615001</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>申请人</strong></td>
+                                        <td>张三</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>被申请人</strong></td>
+                                        <td>某科技有限公司</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>调解员</strong></td>
+                                        <td>
+                                            <div class="d-flex justify-content-between">
+                                                <span>李四</span>
+                                                <button class="btn btn-sm btn-outline-secondary">更换</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>争议类别</strong></td>
+                                        <td>劳动报酬</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>涉案金额</strong></td>
+                                        <td>¥28,500.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>申请日期</strong></td>
+                                        <td>2023-06-01</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>当前状态</strong></td>
+                                        <td><span class="badge badge-primary">调解中</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-gavel me-2"></i>调解请求</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>请求被申请人支付2023年3月至5月拖欠工资共计¥28,500元。</p>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#request-details">
+                                    查看详细请求
+                                </button>
+                                <div class="collapse mt-2" id="request-details">
+                                    <div class="card card-body">
+                                        <small>事实与理由：申请人于2022年6月入职被申请人公司，担任前端开发工程师，约定月工资为¥9,500元。自2023年3月起，被申请人开始拖欠工资，截至2023年5月，已累计拖欠工资3个月，共计¥28,500元。申请人多次催要未果，故申请调解。</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>重要提醒</h6>
+                            <p class="mb-2">本案已受理14天，需确认双方调解意向：</p>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-sm btn-success">双方同意调解</button>
+                                <button class="btn btn-sm btn-danger">一方不同意调解</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 我的案件页面 -->
+            <div id="my-cases-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-list"></i>
+                        <div>
+                            <h2>我的案件</h2>
+                            <p>查看您负责的所有调解案件</p>
+                        </div>
+                    </div>
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" placeholder="搜索申请人/被申请人..." id="case-search">
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-table me-2"></i>案件列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>案件编号</th>
+                                        <th>申请人</th>
+                                        <th>被申请人</th>
+                                        <th>申请日期</th>
+                                        <th>争议类别</th>
+                                        <th>调解员</th>
+                                        <th>结案结果</th>
+                                        <th>结案日期</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-cases-list">
+                                    <!-- 案件数据将通过JS动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="案件分页" class="mt-3">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1">上一页</a>
+                                </li>
+                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                <li class="page-item">
+                                    <a class="page-link" href="#">下一页</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 所有案件页面 -->
+            <div id="all-cases-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-database"></i>
+                        <div>
+                            <h2>所有案件</h2>
+                            <p>查看系统所有调解案件（仅管理员和值班调解员可见）</p>
+                        </div>
+                    </div>
+                    <div class="d-flex">
+                        <div class="search-box me-3">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="form-control" placeholder="搜索申请人/被申请人..." id="all-case-search">
+                        </div>
+                        <div class="admin-only">
+                            <select class="form-select" id="mediator-filter">
+                                <option value="">所有调解员</option>
+                                <option value="mediator01">李四</option>
+                                <option value="mediator02">王五</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list-alt me-2"></i>全部案件列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>案件编号</th>
+                                        <th>申请人</th>
+                                        <th>被申请人</th>
+                                        <th>申请日期</th>
+                                        <th>争议类别</th>
+                                        <th>调解员</th>
+                                        <th>当前状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="all-cases-list">
+                                    <!-- 所有案件数据将通过JS动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 调解员分析页面 -->
+            <div id="mediator-analysis-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-chart-bar"></i>
+                        <div>
+                            <h2>调解员分析</h2>
+                            <p>查看各调解员的案件统计与绩效分析</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-line me-2"></i>调解员绩效概览</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-value">15</div>
+                                    <div class="stat-label">李四 - 总收案数</div>
+                                    <div class="stat-trend up">成功率: 73.3%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card success">
+                                    <div class="stat-value">12</div>
+                                    <div class="stat-label">王五 - 总收案数</div>
+                                    <div class="stat-trend up">成功率: 66.7%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card warning">
+                                    <div class="stat-value">8</div>
+                                    <div class="stat-label">赵六 - 总收案数</div>
+                                    <div class="stat-trend up">成功率: 62.5%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card info">
+                                    <div class="stat-value">7</div>
+                                    <div class="stat-label">孙七 - 总收案数</div>
+                                    <div class="stat-trend up">成功率: 85.7%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-table me-2"></i>详细统计分析</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>调解员</th>
+                                        <th>收案数</th>
+                                        <th>结案数</th>
+                                        <th>调解成功</th>
+                                        <th>调解不成</th>
+                                        <th>驳回</th>
+                                        <th>成功率</th>
+                                        <th>平均调解周期</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>李四</td>
+                                        <td>15</td>
+                                        <td>13</td>
+                                        <td>11</td>
+                                        <td>1</td>
+                                        <td>1</td>
+                                        <td>84.6%</td>
+                                        <td>14.2天</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">查看明细</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>王五</td>
+                                        <td>12</td>
+                                        <td>10</td>
+                                        <td>8</td>
+                                        <td>2</td>
+                                        <td>0</td>
+                                        <td>80.0%</td>
+                                        <td>16.5天</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">查看明细</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>赵六</td>
+                                        <td>8</td>
+                                        <td>6</td>
+                                        <td>5</td>
+                                        <td>1</td>
+                                        <td>0</td>
+                                        <td>83.3%</td>
+                                        <td>12.8天</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">查看明细</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>孙七</td>
+                                        <td>7</td>
+                                        <td>5</td>
+                                        <td>5</td>
+                                        <td>0</td>
+                                        <td>0</td>
+                                        <td>100%</td>
+                                        <td>11.3天</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">查看明细</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button class="btn btn-primary">
+                                <i class="fas fa-download me-2"></i>导出统计分析报告
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 通讯录页面 -->
+            <div id="address-book-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-address-book"></i>
+                        <div>
+                            <h2>通讯录</h2>
+                            <p>查看系统内所有用户联系方式</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-user-tie me-2"></i>调解员</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group">
+                                    <div class="list-group-item d-flex align-items-center">
+                                        <div class="user-avatar me-3">李</div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">李四</h6>
+                                            <small class="text-muted">首席调解员</small>
+                                        </div>
+                                        <div>
+                                            <small>13800138001</small>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center">
+                                        <div class="user-avatar me-3">王</div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">王五</h6>
+                                            <small class="text-muted">调解员</small>
+                                        </div>
+                                        <div>
+                                            <small>13800138002</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-user-cog me-2"></i>管理员</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="list-group">
+                                    <div class="list-group-item d-flex align-items-center">
+                                        <div class="user-avatar me-3">张</div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">张主任</h6>
+                                            <small class="text-muted">系统管理员</small>
+                                        </div>
+                                        <div>
+                                            <small>13800138000</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="fas fa-phone-alt me-2"></i>快速拨号</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-primary text-start">
+                                        <i class="fas fa-phone me-2"></i>街道办公室: 010-12345678
+                                    </button>
+                                    <button class="btn btn-outline-primary text-start">
+                                        <i class="fas fa-phone me-2"></i>法律援助: 12348
+                                    </button>
+                                    <button class="btn btn-outline-primary text-start">
+                                        <i class="fas fa-phone me-2"></i>劳动监察: 12333
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 用户管理页面 -->
+            <div id="user-management-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-users-cog"></i>
+                        <div>
+                            <h2>用户管理</h2>
+                            <p>管理员功能：管理所有系统用户</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary">
+                        <i class="fas fa-user-plus me-2"></i>添加用户
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-users me-2"></i>用户列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>姓名</th>
+                                        <th>角色</th>
+                                        <th>注册时间</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>mediator01</td>
+                                        <td>李四</td>
+                                        <td><span class="badge badge-primary">调解员</span></td>
+                                        <td>2023-01-15</td>
+                                        <td><span class="badge badge-success">正常</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">编辑</button>
+                                            <button class="btn btn-sm btn-outline-danger">禁用</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>admin</td>
+                                        <td>张主任</td>
+                                        <td><span class="badge badge-warning">管理员</span></td>
+                                        <td>2023-01-10</td>
+                                        <td><span class="badge badge-success">正常</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">编辑</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 系统设置页面 -->
+            <div id="settings-page" class="page-content" style="display: none;">
+                <div class="page-header">
+                    <div class="page-title">
+                        <i class="fas fa-cog"></i>
+                        <div>
+                            <h2>系统设置</h2>
+                            <p>系统参数配置</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-sliders-h me-2"></i>系统参数设置</h5>
+                    </div>
+                    <div class="card-body">
+                        <form>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">系统名称</label>
+                                    <input type="text" class="form-control" value="劳动仲裁调解系统">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">短信通知模板</label>
+                                    <select class="form-select">
+                                        <option>默认模板</option>
+                                        <option>简洁模板</option>
+                                        <option>详细模板</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">调解提醒天数</label>
+                                    <input type="number" class="form-control" value="15" min="1" max="30">
+                                    <small class="text-muted">收案后多少天提醒调解员确认双方调解意向</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">自动分配调解员</label>
+                                    <select class="form-select">
+                                        <option>按值班顺序分配</option>
+                                        <option>按案件类型分配</option>
+                                        <option>按调解员空闲程度分配</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">系统公告</label>
+                                <textarea class="form-control" rows="3" placeholder="输入系统公告内容..."></textarea>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label">启用短信通知功能</label>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" checked>
+                                <label class="form-check-label">启用AI分析功能</label>
+                            </div>
+                            
+                            <div class="form-check mb-4">
+                                <input class="form-check-input" type="checkbox">
+                                <label class="form-check-label">启用自动案件归档</label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">保存设置</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div class="modal fade" id="onlineMediationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">线上调解会议</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center p-4">
+                        <i class="fas fa-video fa-4x text-primary mb-3"></i>
+                        <h4>发起线上调解会议</h4>
+                        <p class="text-muted">系统将生成会议链接并通过短信发送给双方当事人</p>
+                        
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6>会议信息</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">会议时间</label>
+                                            <input type="datetime-local" class="form-control" value="2023-06-20T14:30">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">预计时长</label>
+                                            <select class="form-select">
+                                                <option>30分钟</option>
+                                                <option selected>60分钟</option>
+                                                <option>90分钟</option>
+                                                <option>120分钟</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6>功能设置</h6>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked>
+                                            <label class="form-check-label">自动录制会议</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked>
+                                            <label class="form-check-label">AI实时记录</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" checked>
+                                            <label class="form-check-label">在线签字功能</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary">发送会议邀请</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="aiAnalysisModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">AI案件分析报告</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6>案件分析摘要</h6>
+                        <p>本案为劳动报酬争议，申请人主张被申请人拖欠2023年3月至5月工资共计¥28,500元。根据《劳动合同法》第三十条，用人单位应当按照劳动合同约定和国家规定，向劳动者及时足额支付劳动报酬。</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>调解要旨</h6>
+                        <ul>
+                            <li>重点核实工资支付凭证和考勤记录</li>
+                            <li>确认是否存在法定扣减工资的情形</li>
+                            <li>评估被申请人支付能力和支付意愿</li>
+                            <li>考虑分期支付方案的可能性</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>类似判例参考</h6>
+                        <p>类似案例中，法院普遍支持劳动者追索劳动报酬的请求，特别是对于事实清楚、证据充分的案件。在调解中可参考(2022)京0105民初12345号案件。</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>AI互动分析</h6>
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="向AI提问...">
+                            <button class="btn btn-outline-primary" type="button">提问</button>
+                        </div>
+                        <div class="card card-body">
+                            <small>您可以通过提问获取更多案件分析建议，例如："本案中加班费的计算标准是什么？"或"如果被申请人提出抗辩理由，应如何应对？"</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary">导出分析报告</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="exportCaseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">导出电子卷宗</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>请选择要导出的卷宗文档：</p>
+                    <div class="list-group">
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            调解卷宗目录封面
+                        </label>
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            卷宗目录
+                        </label>
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            结案审批表
+                        </label>
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            受理审批表
+                        </label>
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            送达回证
+                        </label>
+                        <label class="list-group-item">
+                            <input class="form-check-input me-2" type="checkbox" checked>
+                            调解笔录
+                        </label>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label">导出格式</label>
+                        <select class="form-select">
+                            <option selected>PDF格式</option>
+                            <option>Word格式</option>
+                            <option>Excel格式</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary">一键导出</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 留言模态框 -->
+    <div class="modal fade" id="messageModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">给调解员留言</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">案件编号</label>
+                        <input type="text" class="form-control" id="message-case-id" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">调解员</label>
+                        <input type="text" class="form-control" id="message-mediator" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">留言内容 *</label>
+                        <textarea class="form-control" id="message-content" rows="4" placeholder="请输入留言内容..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="send-message-btn">发送留言</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 案件摘要模态框 -->
+    <div class="modal fade" id="caseSummaryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">案件摘要</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="case-summary-content">
+                        <!-- 案件摘要内容将通过JS动态加载 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 模拟数据
+        const mockData = {
+            users: {
+                'mediator01': { name: '李四', role: 'mediator', password: '123456', avatar: '李' },
+                'mediator02': { name: '王五', role: 'mediator', password: '123456', avatar: '王' },
+                'admin': { name: '张主任', role: 'admin', password: '123456', avatar: '张' },
+                'user01': { name: '张三', role: 'personal', password: '123456', avatar: '张' },
+                'company01': { name: '某科技有限公司', role: 'company', password: '123456', avatar: '科' }
+            },
+            cases: [
+                {
+                    id: 'LA20230615001',
+                    applicant: '张三',
+                    respondent: '某科技有限公司',
+                    applyDate: '2023-06-01',
+                    disputeType: '劳动报酬',
+                    mediator: '李四',
+                    status: 'in-progress',
+                    result: '',
+                    closeDate: '',
+                    amount: 28500
+                },
+                {
+                    id: 'LA20230610002',
+                    applicant: '李华',
+                    respondent: '某餐饮公司',
+                    applyDate: '2023-06-10',
+                    disputeType: '解除和终止合同',
+                    mediator: '李四',
+                    status: 'completed',
+                    result: '调解成功',
+                    closeDate: '2023-06-12',
+                    amount: 12000
+                },
+                {
+                    id: 'LA20230605003',
+                    applicant: '王明',
+                    respondent: '某制造企业',
+                    applyDate: '2023-06-05',
+                    disputeType: '工伤保险',
+                    mediator: '王五',
+                    status: 'pending',
+                    result: '',
+                    closeDate: '',
+                    amount: 35000
+                },
+                {
+                    id: 'LA20230520004',
+                    applicant: '刘芳',
+                    respondent: '某零售公司',
+                    applyDate: '2023-05-20',
+                    disputeType: '经济补偿金或赔偿金',
+                    mediator: '李四',
+                    status: 'completed',
+                    result: '调解成功',
+                    closeDate: '2023-05-28',
+                    amount: 18000
+                },
+                {
+                    id: 'LA20230515005',
+                    applicant: '赵强',
+                    respondent: '某建筑公司',
+                    applyDate: '2023-05-15',
+                    disputeType: '劳动报酬',
+                    mediator: '王五',
+                    status: 'in-progress',
+                    result: '',
+                    closeDate: '',
+                    amount: 42000
+                }
+            ],
+            visitorRecords: [
+                {
+                    id: 'VR20230615001',
+                    name: '张三',
+                    phone: '13800138003',
+                    disputeType: '劳动报酬',
+                    registerDate: '2023-06-15',
+                    status: '已发送链接'
+                },
+                {
+                    id: 'VR20230614002',
+                    name: '王明',
+                    phone: '13800138004',
+                    disputeType: '工伤保险',
+                    registerDate: '2023-06-14',
+                    status: '已填写'
+                }
+            ],
+            broadcasts: [
+                {
+                    id: 'BC20230615001',
+                    title: '今日值班交接事项',
+                    content: '今日上午有2位到访咨询，均已登记。其中一位情绪较为激动，建议下一位值班调解员关注。下午3点有线上调解会议，请提前测试设备。',
+                    type: 'handover',
+                    urgency: 'normal',
+                    author: '李四',
+                    authorRole: 'mediator',
+                    createdAt: '2023-06-15 08:30',
+                    status: 'published',
+                    needReview: false
+                },
+                {
+                    id: 'BC20230614002',
+                    title: '特殊案件提醒：群体性纠纷预警',
+                    content: '收到某制造企业5名员工集体咨询，涉及加班费拖欠问题。该企业目前经营困难，存在群体性纠纷风险。请各位调解员在处理相关案件时注意方式方法，及时上报。',
+                    type: 'special',
+                    urgency: 'important',
+                    author: '张主任',
+                    authorRole: 'admin',
+                    createdAt: '2023-06-14 16:45',
+                    status: 'published',
+                    needReview: false
+                },
+                {
+                    id: 'BC20230613003',
+                    title: '紧急工作安排调整',
+                    content: '因明天上午街道有重要会议，原定明天上午的调解会议全部调整至下午或后天。请相关调解员及时通知当事人并做好解释工作。',
+                    type: 'notice',
+                    urgency: 'emergency',
+                    author: '张主任',
+                    authorRole: 'admin',
+                    createdAt: '2023-06-13 18:20',
+                    status: 'published',
+                    needReview: false
+                },
+                {
+                    id: 'BC20230610004',
+                    title: '新调解文书模板上线',
+                    content: '根据最新政策要求，调解文书模板已更新。请各位调解员下载使用新模板，旧模板将于下周停用。新模板已上传至系统文档中心。',
+                    type: 'policy',
+                    urgency: 'normal',
+                    author: '王五',
+                    authorRole: 'mediator',
+                    createdAt: '2023-06-10 10:15',
+                    status: 'published',
+                    needReview: true,
+                    reviewStatus: 'approved'
+                }
+            ]
+        };
+
+        // 当前用户状态
+        let currentUser = null;
+        let currentPage = 'dashboard';
+        let currentQueryResults = [];
+
+        // DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 登录功能
+            document.getElementById('login-btn').addEventListener('click', function() {
+                const role = document.getElementById('login-role').value;
+                const username = document.getElementById('login-username').value;
+                const password = document.getElementById('login-password').value;
+                
+                if (!role || !username || !password) {
+                    alert('请填写完整的登录信息');
+                    return;
+                }
+                
+                // 验证用户
+                if (mockData.users[username] && mockData.users[username].password === password) {
+                    currentUser = {
+                        username: username,
+                        name: mockData.users[username].name,
+                        role: mockData.users[username].role,
+                        avatar: mockData.users[username].avatar
+                    };
+                    
+                    // 切换到主系统
+                    document.getElementById('login-page').style.display = 'none';
+                    document.getElementById('main-system').style.display = 'block';
+                    
+                    // 更新用户信息
+                    document.getElementById('current-user-name').textContent = currentUser.name;
+                    document.getElementById('user-avatar').textContent = currentUser.avatar;
+                    document.getElementById('current-user-role').textContent = 
+                        currentUser.role === 'mediator' ? '调解员' : 
+                        currentUser.role === 'admin' ? '管理员' : 
+                        currentUser.role === 'personal' ? '个人用户' : '企业用户';
+                    
+                    // 根据角色显示/隐藏菜单项
+                    updateMenuVisibility();
+                    
+                    // 加载工作台数据
+                    loadDashboardData();
+                    
+                } else {
+                    alert('用户名或密码错误，请使用演示账号登录');
+                }
+            });
+            
+            // 注销功能
+            document.getElementById('logout-btn').addEventListener('click', function() {
+                currentUser = null;
+                document.getElementById('main-system').style.display = 'none';
+                document.getElementById('login-page').style.display = 'block';
+                
+                // 清空登录表单
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                document.getElementById('login-role').value = '';
+            });
+            
+            // 侧边栏导航点击
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = this.getAttribute('data-page');
+                    navigateToPage(page);
+                });
+            });
+            
+            // 工作台按钮
+            document.querySelectorAll('[data-page]').forEach(btn => {
+                if (btn.tagName === 'BUTTON') {
+                    btn.addEventListener('click', function() {
+                        const page = this.getAttribute('data-page');
+                        navigateToPage(page);
+                    });
+                }
+            });
+            
+            // 到访登记表单提交
+            document.getElementById('visitor-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // 生成登记编号
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                               String(today.getMonth()+1).padStart(2, '0') + 
+                               String(today.getDate()).padStart(2, '0');
+                const recordId = 'VR' + dateStr + '001';
+                
+                alert(`已生成登记编号：${recordId}\n短信链接已发送至：${document.getElementById('visitor-phone').value}`);
+                
+                // 添加到访记录
+                const newRecord = {
+                    id: recordId,
+                    name: document.getElementById('visitor-name').value,
+                    phone: document.getElementById('visitor-phone').value,
+                    disputeType: document.getElementById('dispute-type').options[document.getElementById('dispute-type').selectedIndex].text,
+                    registerDate: document.getElementById('register-date').value,
+                    status: '已发送链接'
+                };
+                
+                mockData.visitorRecords.unshift(newRecord);
+                loadVisitorRecords();
+                
+                // 清空表单
+                this.reset();
+                document.getElementById('register-date').value = '2023-06-15';
+            });
+            
+            // 调解申请步骤导航
+            document.getElementById('apply-next1').addEventListener('click', function() {
+                document.getElementById('apply-step1').style.display = 'none';
+                document.getElementById('apply-step2').style.display = 'block';
+                document.getElementById('step1').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+            });
+            
+            document.getElementById('apply-next2').addEventListener('click', function() {
+                document.getElementById('apply-step2').style.display = 'none';
+                document.getElementById('apply-step3').style.display = 'block';
+                document.getElementById('step2').classList.remove('active');
+                document.getElementById('step3').classList.add('active');
+            });
+            
+            document.getElementById('apply-back2').addEventListener('click', function() {
+                document.getElementById('apply-step2').style.display = 'none';
+                document.getElementById('apply-step1').style.display = 'block';
+                document.getElementById('step2').classList.remove('active');
+                document.getElementById('step1').classList.add('active');
+            });
+            
+            document.getElementById('apply-back3').addEventListener('click', function() {
+                document.getElementById('apply-step3').style.display = 'none';
+                document.getElementById('apply-step2').style.display = 'block';
+                document.getElementById('step3').classList.remove('active');
+                document.getElementById('step2').classList.add('active');
+            });
+            
+            // 提交调解申请
+            document.getElementById('request-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // 生成案件编号
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                               String(today.getMonth()+1).padStart(2, '0') + 
+                               String(today.getDate()).padStart(2, '0');
+                const caseId = 'LA' + dateStr + '001';
+                
+                // 显示完成页面
+                document.getElementById('apply-step3').style.display = 'none';
+                document.getElementById('apply-step4').style.display = 'block';
+                document.getElementById('step3').classList.remove('active');
+                document.getElementById('step4').classList.add('active');
+                document.getElementById('case-number-display').textContent = caseId;
+                
+                // 添加到模拟数据
+                const newCase = {
+                    id: caseId,
+                    applicant: document.getElementById('applicant-name').value || '张三',
+                    respondent: document.getElementById('respondent-name').value || '某科技有限公司',
+                    applyDate: today.toISOString().split('T')[0],
+                    disputeType: document.getElementById('dispute-category').options[document.getElementById('dispute-category').selectedIndex].text,
+                    mediator: currentUser.role === 'mediator' ? currentUser.name : '李四',
+                    status: 'pending',
+                    result: '',
+                    closeDate: '',
+                    amount: parseFloat(document.getElementById('case-amount').value) || 0
+                };
+                
+                mockData.cases.unshift(newCase);
+            });
+            
+            // 选择申请人/被申请人
+            document.getElementById('select-applicant').addEventListener('click', function() {
+                this.classList.add('selected');
+                document.getElementById('select-respondent').classList.remove('selected');
+            });
+            
+            document.getElementById('select-respondent').addEventListener('click', function() {
+                this.classList.add('selected');
+                document.getElementById('select-applicant').classList.remove('selected');
+            });
+            
+            // 线上调解会议按钮
+            document.getElementById('online-mediation-btn').addEventListener('click', function() {
+                const modal = new bootstrap.Modal(document.getElementById('onlineMediationModal'));
+                modal.show();
+            });
+            
+            // AI分析按钮
+            document.getElementById('ai-analysis-btn').addEventListener('click', function() {
+                const modal = new bootstrap.Modal(document.getElementById('aiAnalysisModal'));
+                modal.show();
+            });
+            
+            // 导出卷宗按钮
+            document.getElementById('export-case-btn').addEventListener('click', function() {
+                const modal = new bootstrap.Modal(document.getElementById('exportCaseModal'));
+                modal.show();
+            });
+            
+            // 站内广播功能
+            document.getElementById('new-broadcast-btn').addEventListener('click', function() {
+                const formContainer = document.getElementById('broadcast-form-container');
+                if (formContainer.style.display === 'none') {
+                    formContainer.style.display = 'block';
+                    this.innerHTML = '<i class="fas fa-times me-2"></i>取消发布';
+                } else {
+                    formContainer.style.display = 'none';
+                    this.innerHTML = '<i class="fas fa-plus me-2"></i>发布广播';
+                }
+            });
+            
+            document.getElementById('cancel-broadcast-btn').addEventListener('click', function() {
+                document.getElementById('broadcast-form-container').style.display = 'none';
+                document.getElementById('new-broadcast-btn').innerHTML = '<i class="fas fa-plus me-2"></i>发布广播';
+                document.getElementById('broadcast-form').reset();
+            });
+            
+            document.getElementById('broadcast-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const title = document.getElementById('broadcast-title').value;
+                const type = document.getElementById('broadcast-type').value;
+                const content = document.getElementById('broadcast-content').value;
+                const urgency = document.querySelector('input[name="urgency"]:checked').value;
+                const needReview = document.getElementById('broadcast-need-review').checked;
+                
+                // 生成广播ID
+                const today = new Date();
+                const dateStr = today.getFullYear() + 
+                               String(today.getMonth()+1).padStart(2, '0') + 
+                               String(today.getDate()).padStart(2, '0');
+                const broadcastId = 'BC' + dateStr + String(mockData.broadcasts.length + 1).padStart(3, '0');
+                
+                // 创建新广播
+                const newBroadcast = {
+                    id: broadcastId,
+                    title: title,
+                    content: content,
+                    type: type,
+                    urgency: urgency,
+                    author: currentUser.name,
+                    authorRole: currentUser.role,
+                    createdAt: today.toISOString().split('T')[0] + ' ' + 
+                               String(today.getHours()).padStart(2, '0') + ':' + 
+                               String(today.getMinutes()).padStart(2, '0'),
+                    status: needReview ? 'pending' : 'published',
+                    needReview: needReview
+                };
+                
+                mockData.broadcasts.unshift(newBroadcast);
+                
+                // 重置表单
+                this.reset();
+                document.getElementById('broadcast-form-container').style.display = 'none';
+                document.getElementById('new-broadcast-btn').innerHTML = '<i class="fas fa-plus me-2"></i>发布广播';
+                
+                // 重新加载广播列表
+                loadBroadcasts();
+                
+                alert(needReview ? '广播已提交，等待管理员审核' : '广播发布成功！');
+            });
+            
+            // 案件查询功能
+            document.getElementById('case-query-btn').addEventListener('click', function() {
+                performCaseQuery();
+            });
+            
+            document.getElementById('case-query-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performCaseQuery();
+                }
+            });
+            
+            // 快速登记按钮
+            document.getElementById('quick-register-btn').addEventListener('click', function() {
+                navigateToPage('case-apply');
+            });
+            
+            // 发送留言功能
+            document.getElementById('send-message-btn').addEventListener('click', function() {
+                const messageContent = document.getElementById('message-content').value;
+                if (!messageContent.trim()) {
+                    alert('请输入留言内容');
+                    return;
+                }
+                
+                alert('留言已发送给调解员！');
+                document.getElementById('message-content').value = '';
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('messageModal'));
+                modal.hide();
+            });
+            
+            // 模拟登录
+            simulateLogin();
+        });
+        
+        // 模拟登录（演示用）
+        function simulateLogin() {
+            // 自动填充调解员账号
+            document.getElementById('login-role').value = 'mediator';
+            document.getElementById('login-username').value = 'mediator01';
+            document.getElementById('login-password').value = '123456';
+        }
+        
+        // 根据用户角色更新菜单可见性
+        function updateMenuVisibility() {
+            const role = currentUser.role;
+            
+            document.querySelectorAll('.mediator-only').forEach(el => {
+                el.style.display = role === 'mediator' ? 'block' : 'none';
+            });
+            
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = role === 'admin' ? 'block' : 'none';
+            });
+            
+            document.querySelectorAll('.personal-only').forEach(el => {
+                el.style.display = role === 'personal' ? 'block' : 'none';
+            });
+            
+            document.querySelectorAll('.company-only').forEach(el => {
+                el.style.display = role === 'company' ? 'block' : 'none';
+            });
+        }
+        
+        // 页面导航
+        function navigateToPage(page) {
+            // 隐藏所有页面
+            document.querySelectorAll('.page-content').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            // 显示目标页面
+            document.getElementById(`${page}-page`).style.display = 'block';
+            
+            // 更新侧边栏活动状态
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('data-page') === page) {
+                    link.classList.add('active');
+                }
+            });
+            
+            currentPage = page;
+            
+            // 加载页面数据
+            switch(page) {
+                case 'dashboard':
+                    loadDashboardData();
+                    break;
+                case 'broadcast':
+                    loadBroadcasts();
+                    break;
+                case 'case-query':
+                    resetCaseQuery();
+                    break;
+                case 'visitor-register':
+                    loadVisitorRecords();
+                    break;
+                case 'my-cases':
+                    loadMyCases();
+                    break;
+                case 'all-cases':
+                    loadAllCases();
+                    break;
+                case 'mediator-analysis':
+                    // 分析页面数据已静态加载
+                    break;
+            }
+        }
+        
+        // 加载工作台数据
+        function loadDashboardData() {
+            if (!currentUser) return;
+            
+            const role = currentUser.role;
+            
+            // 显示对应的仪表盘
+            document.getElementById('mediator-dashboard').style.display = role === 'mediator' ? 'block' : 'none';
+            document.getElementById('user-dashboard').style.display = (role === 'personal' || role === 'company') ? 'block' : 'none';
+            document.getElementById('admin-dashboard').style.display = role === 'admin' ? 'block' : 'none';
+            
+            if (role === 'mediator') {
+                // 加载调解员待办案件
+                const pendingCases = mockData.cases.filter(c => 
+                    c.mediator === currentUser.name && (c.status === 'pending' || c.status === 'in-progress')
+                );
+                
+                const tbody = document.getElementById('my-pending-cases');
+                tbody.innerHTML = '';
+                
+                pendingCases.forEach((caseItem, index) => {
+                    const statusText = caseItem.status === 'pending' ? '待受理' : '调解中';
+                    const statusClass = caseItem.status === 'pending' ? 'badge-warning' : 'badge-primary';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${caseItem.id}</td>
+                        <td>${caseItem.applicant}</td>
+                        <td>${caseItem.respondent}</td>
+                        <td>${caseItem.applyDate}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewCaseDetail('${caseItem.id}')">
+                                处理
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                // 更新统计数字
+                const myCases = mockData.cases.filter(c => c.mediator === currentUser.name);
+                const completedCases = myCases.filter(c => c.status === 'completed');
+                const successCases = completedCases.filter(c => c.result === '调解成功');
+                
+                document.getElementById('total-cases').textContent = myCases.length;
+                document.getElementById('success-cases').textContent = successCases.length;
+                document.getElementById('pending-cases').textContent = myCases.filter(c => c.status === 'pending' || c.status === 'in-progress').length;
+                document.getElementById('failed-cases').textContent = completedCases.length - successCases.length;
+                
+            } else if (role === 'personal' || role === 'company') {
+                // 加载用户案件
+                const userCases = mockData.cases.filter(c => 
+                    c.applicant === currentUser.name || c.respondent === currentUser.name
+                );
+                
+                const tbody = document.getElementById('user-cases');
+                tbody.innerHTML = '';
+                
+                userCases.forEach((caseItem, index) => {
+                    const statusText = caseItem.status === 'pending' ? '待受理' : 
+                                     caseItem.status === 'in-progress' ? '调解中' : 
+                                     caseItem.status === 'completed' ? '已结案' : '未知';
+                    
+                    const statusClass = caseItem.status === 'pending' ? 'badge-warning' : 
+                                      caseItem.status === 'in-progress' ? 'badge-primary' : 
+                                      caseItem.status === 'completed' ? 'badge-success' : '';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${caseItem.id}</td>
+                        <td>${caseItem.disputeType}</td>
+                        <td>${caseItem.applicant === currentUser.name ? caseItem.respondent : caseItem.applicant}</td>
+                        <td>${caseItem.applyDate}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewCaseDetail('${caseItem.id}')">
+                                查看
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        }
+        
+        // 加载到访记录
+        function loadVisitorRecords() {
+            const tbody = document.getElementById('visitor-records');
+            tbody.innerHTML = '';
+            
+            mockData.visitorRecords.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.id}</td>
+                    <td>${record.name}</td>
+                    <td>${record.phone}</td>
+                    <td>${record.disputeType}</td>
+                    <td>${record.registerDate}</td>
+                    <td><span class="badge badge-success">${record.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary">发送提醒</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // 加载我的案件
+        function loadMyCases() {
+            if (currentUser.role !== 'mediator') return;
+            
+            const myCases = mockData.cases.filter(c => c.mediator === currentUser.name);
+            const tbody = document.getElementById('my-cases-list');
+            tbody.innerHTML = '';
+            
+            myCases.forEach((caseItem, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${caseItem.id}</td>
+                    <td>${caseItem.applicant}</td>
+                    <td>${caseItem.respondent}</td>
+                    <td>${caseItem.applyDate}</td>
+                    <td>${caseItem.disputeType}</td>
+                    <td>${caseItem.mediator}</td>
+                    <td>${caseItem.result || '-'}</td>
+                    <td>${caseItem.closeDate || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewCaseDetail('${caseItem.id}')">
+                            详情
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // 加载所有案件
+        function loadAllCases() {
+            const tbody = document.getElementById('all-cases-list');
+            tbody.innerHTML = '';
+            
+            mockData.cases.forEach(caseItem => {
+                const statusText = caseItem.status === 'pending' ? '待受理' : 
+                                 caseItem.status === 'in-progress' ? '调解中' : 
+                                 caseItem.status === 'completed' ? '已结案' : '未知';
+                
+                const statusClass = caseItem.status === 'pending' ? 'badge-warning' : 
+                                  caseItem.status === 'in-progress' ? 'badge-primary' : 
+                                  caseItem.status === 'completed' ? 'badge-success' : '';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${caseItem.id}</td>
+                    <td>${caseItem.applicant}</td>
+                    <td>${caseItem.respondent}</td>
+                    <td>${caseItem.applyDate}</td>
+                    <td>${caseItem.disputeType}</td>
+                    <td>${caseItem.mediator}</td>
+                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewCaseDetail('${caseItem.id}')">
+                            查看
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // 加载广播列表
+        function loadBroadcasts() {
+            const broadcastList = document.getElementById('broadcast-list');
+            broadcastList.innerHTML = '';
+            
+            // 根据用户角色过滤广播
+            let filteredBroadcasts = mockData.broadcasts;
+            
+            // 普通调解员只能看到已发布的广播
+            if (currentUser.role === 'mediator') {
+                filteredBroadcasts = mockData.broadcasts.filter(b => 
+                    b.status === 'published' || (b.author === currentUser.name && b.status === 'pending')
+                );
+            }
+            
+            if (filteredBroadcasts.length === 0) {
+                broadcastList.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-bullhorn fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">暂无广播消息</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredBroadcasts.forEach(broadcast => {
+                const broadcastElement = document.createElement('div');
+                broadcastElement.className = `broadcast-message ${broadcast.urgency}`;
+                
+                // 确定广播类型样式
+                let typeClass = '';
+                let typeText = '';
+                switch(broadcast.type) {
+                    case 'handover':
+                        typeClass = 'handover';
+                        typeText = '值班交接';
+                        break;
+                    case 'special':
+                        typeClass = 'special';
+                        typeText = '特殊案件';
+                        break;
+                    case 'notice':
+                        typeClass = 'notice';
+                        typeText = '工作通知';
+                        break;
+                    case 'policy':
+                        typeClass = 'policy';
+                        typeText = '政策变更';
+                        break;
+                }
+                
+                // 确定状态文本
+                let statusText = '';
+                if (broadcast.status === 'pending') {
+                    statusText = '<span class="badge badge-warning ms-2">待审核</span>';
+                }
+                
+                broadcastElement.innerHTML = `
+                    <div class="broadcast-header">
+                        <div class="broadcast-title">${broadcast.title}</div>
+                        <div class="broadcast-meta">
+                            <span class="broadcast-type ${typeClass}">${typeText}</span>
+                            <span>${broadcast.author} · ${broadcast.createdAt}</span>
+                            ${statusText}
+                        </div>
+                    </div>
+                    <div class="broadcast-content">
+                        ${broadcast.content}
+                    </div>
+                    <div class="broadcast-actions">
+                        ${broadcast.status === 'pending' && currentUser.role === 'admin' ? `
+                            <button class="btn btn-sm btn-success" onclick="reviewBroadcast('${broadcast.id}', 'approve')">
+                                <i class="fas fa-check me-1"></i>通过
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="reviewBroadcast('${broadcast.id}', 'reject')">
+                                <i class="fas fa-times me-1"></i>驳回
+                            </button>
+                        ` : ''}
+                        ${broadcast.author === currentUser.name && broadcast.status === 'pending' ? `
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editBroadcast('${broadcast.id}')">
+                                <i class="fas fa-edit me-1"></i>编辑
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                
+                broadcastList.appendChild(broadcastElement);
+            });
+        }
+        
+        // 审核广播
+        function reviewBroadcast(broadcastId, action) {
+            const broadcast = mockData.broadcasts.find(b => b.id === broadcastId);
+            if (!broadcast) return;
+            
+            if (action === 'approve') {
+                broadcast.status = 'published';
+                broadcast.reviewStatus = 'approved';
+                alert('广播已审核通过并发布！');
+            } else if (action === 'reject') {
+                broadcast.status = 'rejected';
+                broadcast.reviewStatus = 'rejected';
+                alert('广播已驳回！');
+            }
+            
+            loadBroadcasts();
+        }
+        
+        // 编辑广播
+        function editBroadcast(broadcastId) {
+            alert('编辑广播功能演示（实际功能需连接后端）');
+        }
+        
+        // 案件查询功能
+        function performCaseQuery() {
+            const queryInput = document.getElementById('case-query-input').value.trim();
+            
+            if (!queryInput) {
+                alert('请输入查询条件');
+                return;
+            }
+            
+            // 查询案件（通过申请人或被申请人姓名）
+            const results = mockData.cases.filter(caseItem => 
+                caseItem.applicant.includes(queryInput) || caseItem.respondent.includes(queryInput)
+            );
+            
+            currentQueryResults = results;
+            displayQueryResults(results);
+        }
+        
+        // 显示查询结果
+        function displayQueryResults(results) {
+            const queryResultsContainer = document.getElementById('query-results');
+            const resultCountElement = document.getElementById('query-result-count');
+            
+            if (results.length === 0) {
+                queryResultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted mb-3">未找到相关案件</h5>
+                        <p class="text-muted mb-4">请检查查询条件是否正确，或点击下方按钮进行新案件登记</p>
+                        <button class="btn btn-primary" data-page="case-apply">
+                            <i class="fas fa-plus-circle me-2"></i>快速登记新案件
+                        </button>
+                    </div>
+                `;
+                resultCountElement.textContent = '未找到相关案件';
+                
+                // 重新绑定快速登记按钮事件
+                document.querySelector('#query-results .btn[data-page="case-apply"]').addEventListener('click', function() {
+                    navigateToPage('case-apply');
+                });
+                
+                return;
+            }
+            
+            resultCountElement.textContent = `找到 ${results.length} 个相关案件`;
+            
+            let html = '';
+            results.forEach((caseItem, index) => {
+                const statusText = caseItem.status === 'pending' ? '待受理' : 
+                                 caseItem.status === 'in-progress' ? '调解中' : 
+                                 caseItem.status === 'completed' ? '已结案' : '未知';
+                
+                const statusClass = caseItem.status === 'pending' ? 'badge-warning' : 
+                                  caseItem.status === 'in-progress' ? 'badge-primary' : 
+                                  caseItem.status === 'completed' ? 'badge-success' : 'badge-secondary';
+                
+                html += `
+                    <div class="query-result-item">
+                        <div class="query-result-header">
+                            <div class="query-result-title">案件编号: ${caseItem.id}</div>
+                            <div class="query-result-meta">
+                                <span>申请日期: ${caseItem.applyDate}</span>
+                                <span class="badge ${statusClass}">${statusText}</span>
+                            </div>
+                        </div>
+                        <div class="query-result-details">
+                            <div class="query-detail-item">
+                                <div class="query-detail-label">申请人</div>
+                                <div class="query-detail-value">${caseItem.applicant}</div>
+                            </div>
+                            <div class="query-detail-item">
+                                <div class="query-detail-label">被申请人</div>
+                                <div class="query-detail-value">${caseItem.respondent}</div>
+                            </div>
+                            <div class="query-detail-item">
+                                <div class="query-detail-label">争议类别</div>
+                                <div class="query-detail-value">${caseItem.disputeType}</div>
+                            </div>
+                            <div class="query-detail-item">
+                                <div class="query-detail-label">调解员</div>
+                                <div class="query-detail-value">${caseItem.mediator}</div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-outline-primary" onclick="showCaseSummary('${caseItem.id}')">
+                                <i class="fas fa-eye me-1"></i>查看摘要
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showMessageDialog('${caseItem.id}', '${caseItem.mediator}')">
+                                <i class="fas fa-comment me-1"></i>调解员留言
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            queryResultsContainer.innerHTML = html;
+        }
+        
+        // 重置案件查询
+        function resetCaseQuery() {
+            document.getElementById('case-query-input').value = '';
+            document.getElementById('query-result-count').textContent = '请输入查询条件';
+            document.getElementById('query-results').innerHTML = '';
+            currentQueryResults = [];
+        }
+        
+        // 显示案件摘要
+        function showCaseSummary(caseId) {
+            const caseItem = mockData.cases.find(c => c.id === caseId);
+            if (!caseItem) return;
+            
+            const summaryContent = document.getElementById('case-summary-content');
+            
+            const statusText = caseItem.status === 'pending' ? '待受理' : 
+                             caseItem.status === 'in-progress' ? '调解中' : 
+                             caseItem.status === 'completed' ? '已结案' : '未知';
+            
+            summaryContent.innerHTML = `
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="30%">案件编号</th>
+                        <td>${caseItem.id}</td>
+                    </tr>
+                    <tr>
+                        <th>申请人</th>
+                        <td>${caseItem.applicant}</td>
+                    </tr>
+                    <tr>
+                        <th>被申请人</th>
+                        <td>${caseItem.respondent}</td>
+                    </tr>
+                    <tr>
+                        <th>申请日期</th>
+                        <td>${caseItem.applyDate}</td>
+                    </tr>
+                    <tr>
+                        <th>争议类别</th>
+                        <td>${caseItem.disputeType}</td>
+                    </tr>
+                    <tr>
+                        <th>调解员</th>
+                        <td>${caseItem.mediator}</td>
+                    </tr>
+                    <tr>
+                        <th>当前状态</th>
+                        <td>${statusText}</td>
+                    </tr>
+                    ${caseItem.amount ? `
+                    <tr>
+                        <th>涉案金额</th>
+                        <td>¥${caseItem.amount.toLocaleString()}</td>
+                    </tr>
+                    ` : ''}
+                    ${caseItem.result ? `
+                    <tr>
+                        <th>结案结果</th>
+                        <td>${caseItem.result}</td>
+                    </tr>
+                    ` : ''}
+                    ${caseItem.closeDate ? `
+                    <tr>
+                        <th>结案日期</th>
+                        <td>${caseItem.closeDate}</td>
+                    </tr>
+                    ` : ''}
+                </table>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>提示：</strong>此为案件基本信息摘要，详细调解内容需案件承办调解员权限才能查看。
+                </div>
+            `;
+            
+            const modal = new bootstrap.Modal(document.getElementById('caseSummaryModal'));
+            modal.show();
+        }
+        
+        // 显示留言对话框
+        function showMessageDialog(caseId, mediator) {
+            document.getElementById('message-case-id').value = caseId;
+            document.getElementById('message-mediator').value = mediator;
+            document.getElementById('message-content').value = '';
+            
+            const modal = new bootstrap.Modal(document.getElementById('messageModal'));
+            modal.show();
+        }
+        
+        // 查看案件详情
+        function viewCaseDetail(caseId) {
+            navigateToPage('case-management');
+            
+            // 查找案件信息
+            const caseItem = mockData.cases.find(c => c.id === caseId);
+            if (caseItem) {
+                document.getElementById('case-info').textContent = 
+                    `案件编号: ${caseItem.id} | 申请人: ${caseItem.applicant} | 被申请人: ${caseItem.respondent}`;
+            }
+        }
+        
+        // 全局函数供HTML内联调用
+        window.viewCaseDetail = viewCaseDetail;
+        window.reviewBroadcast = reviewBroadcast;
+        window.editBroadcast = editBroadcast;
+        window.showCaseSummary = showCaseSummary;
+        window.showMessageDialog = showMessageDialog;
+    </script>
+</body>
+</html>

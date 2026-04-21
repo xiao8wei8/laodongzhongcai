@@ -1,12 +1,10 @@
 # 依赖
 node_modules/
 
-# 构建输出
-dist/
-build/
+# 构建输出（后端dist目录会被跟踪）
+# 注意：frontend/dist 会被跟踪
 
-# 环境变量（保留.env，忽略本地覆盖文件）
-.env
+# 环境变量（忽略本地覆盖文件）
 .env.local
 .env.production.local
 .env.*.local

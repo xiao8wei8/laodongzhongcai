@@ -56,8 +56,18 @@ class ApiLogger {
 
 export const apiLogger = new ApiLogger();
 
+// 根据环境变量设置API基础URL
+const getBaseURL = () => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!baseUrl) {
+    // 默认值
+    return import.meta.env.PROD ? '/api' : 'http://localhost:5003/api';
+  }
+  return baseUrl;
+};
+
 const api = axios.create({
-  baseURL: 'http://localhost:5003/api',
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -98,7 +108,7 @@ api.interceptors.response.use(
     // 记录成功的响应
     const { config, status, statusText, data } = response;
     const duration = Date.now() - (config.metadata?.startTime || Date.now());
-    
+
     const log: ApiRequestLog = {
       id: Date.now().toString(),
       url: config.url || '',
@@ -113,7 +123,7 @@ api.interceptors.response.use(
       timestamp: new Date().toISOString(),
       page: config.metadata?.page || getCurrentPage()
     };
-    
+
     apiLogger.addLog(log);
     return response;
   },
@@ -121,7 +131,7 @@ api.interceptors.response.use(
     // 记录失败的响应
     const { config, response, message } = error;
     const duration = Date.now() - (config?.metadata?.startTime || Date.now());
-    
+
     const log: ApiRequestLog = {
       id: Date.now().toString(),
       url: config?.url || '',
@@ -137,9 +147,9 @@ api.interceptors.response.use(
       timestamp: new Date().toISOString(),
       page: config?.metadata?.page || getCurrentPage()
     };
-    
+
     apiLogger.addLog(log);
-    
+
     if (error.response && error.response.status === 401) {
       const { logout } = useAuthStore.getState();
       logout();

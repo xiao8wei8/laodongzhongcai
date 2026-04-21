@@ -1,18 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { createServer } from 'http'
 
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5174,
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5002',
+        target: 'http://localhost:5003',
         changeOrigin: true,
-        secure: false,
-        // 排除前端状态检查端点
-        exclude: ['/api/frontend/status']
+        secure: false
+      },
+      '/socket.io': {
+        target: 'http://localhost:5003',
+        ws: true,
+        changeOrigin: true,
+        secure: false
       }
     }
   }

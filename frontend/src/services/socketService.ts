@@ -8,15 +8,33 @@ class SocketService {
    */
   connect(): Socket {
     if (!this.socket) {
-      // 使用相对路径，通过nginx代理访问
+      // 根据环境判断Socket连接方式
+      const isProduction = import.meta.env.PROD;
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-      const socketUrl = baseUrl.replace('/api', '');
 
-      this.socket = io(socketUrl, {
-        path: '/socket.io',
-        transports: ['websocket', 'polling'],
-        autoConnect: true,
-      });
+      let socketUrl: string;
+      let socketOptions: any;
+
+      if (isProduction) {
+        // 生产环境：通过相对路径，使用nginx代理
+        socketUrl = '';
+        socketOptions = {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          autoConnect: true,
+        };
+      } else {
+        // 开发环境：直接连接后端服务
+        const apiUrl = new URL(baseUrl, window.location.origin);
+        socketUrl = apiUrl.origin;
+        socketOptions = {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          autoConnect: true,
+        };
+      }
+
+      this.socket = io(socketUrl, socketOptions);
 
       this.socket.on('connect', () => {
         console.log('Socket.io连接成功');

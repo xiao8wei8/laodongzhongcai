@@ -8,8 +8,13 @@ class SocketService {
    */
   connect(): Socket {
     if (!this.socket) {
-      this.socket = io('http://localhost:5002', {
-        transports: ['websocket'],
+      // 使用相对路径，通过nginx代理访问
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const socketUrl = baseUrl.replace('/api', '');
+
+      this.socket = io(socketUrl, {
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
         autoConnect: true,
       });
 
@@ -93,7 +98,7 @@ class SocketService {
    * @param event 事件名称
    * @param callback 回调函数
    */
-  off(event: string, callback: Function): void {
+  off(event: string, callback: (...args: any[]) => void): void {
     if (this.socket) {
       this.socket.off(event, callback);
     }

@@ -1,5 +1,14 @@
 // 用户行为统计服务
 
+// 获取API基础URL
+const getApiBaseUrl = () => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!baseUrl) {
+    return import.meta.env.PROD ? '/laodongzhongcai/api' : 'http://localhost:5003/api';
+  }
+  return baseUrl;
+};
+
 // 埋点数据类型
 interface TrackEvent {
   event: string;
@@ -63,7 +72,7 @@ const flushEvents = async () => {
   if (events.length === 0) return;
   
   try {
-    await fetch('/api/analytics/track', {
+    await fetch(`${getApiBaseUrl()}/analytics/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, Descriptions, Timeline, Select, Button, Input, message, Modal, Progress, Tag, Badge, Typography, Checkbox, List, Upload } from 'antd';
 
+// 获取API基础URL
+const getApiBaseUrl = () => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!baseUrl) {
+    return import.meta.env.PROD ? '/laodongzhongcai/api' : 'http://localhost:5003/api';
+  }
+  return baseUrl;
+};
+
 const { Text } = Typography;
 import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, FileTextOutlined, UserOutlined, PhoneOutlined, DollarOutlined, CalendarOutlined, MessageOutlined, UploadOutlined, VideoCameraOutlined, EditOutlined } from '@ant-design/icons';
 import api from '../services/api';
@@ -899,7 +908,7 @@ const CaseDetail: React.FC = () => {
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 8 }}>文件识别（自动提取关键信息）</label>
           <Upload
-            action="/api/evidence/recognize"
+            action={`${getApiBaseUrl()}/evidence/recognize`}
             method="POST"
             data={{ caseId: id }}
             headers={{

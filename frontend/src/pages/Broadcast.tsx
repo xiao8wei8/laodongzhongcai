@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react';
 import { Card, Form, Input, Select, Button, message, List, Badge, Tabs, Upload, Modal, Typography } from 'antd';
 import { SaveOutlined, BellOutlined, CheckCircleOutlined, FileOutlined } from '@ant-design/icons';
 
+// 获取API基础URL
+const getApiBaseUrl = () => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!baseUrl) {
+    return import.meta.env.PROD ? '/laodongzhongcai/api' : 'http://localhost:5003/api';
+  }
+  return baseUrl;
+};
+
 const { Title } = Typography;
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
@@ -286,7 +295,7 @@ const Broadcast: React.FC = () => {
                   label="附件"
                 >
                   <Upload
-                    action="/api/evidence"
+                    action={`${getApiBaseUrl()}/evidence`}
                     multiple
                     maxCount={5}
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
@@ -616,7 +625,7 @@ const Broadcast: React.FC = () => {
                 label="附件"
               >
                 <Upload
-                  action="/api/evidence"
+                  action={`${getApiBaseUrl()}/evidence`}
                   multiple
                   maxCount={5}
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"

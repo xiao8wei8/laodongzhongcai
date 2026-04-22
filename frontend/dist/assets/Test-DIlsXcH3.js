@@ -1,1 +1,0 @@
-import{j as r}from"./index-BN1zCS6P.js";import{T as e}from"./index-Duwoohow.js";import"./TextArea-DlzNMyKe.js";const{Title:o}=e,d=()=>r.jsxs("div",{style:{padding:24,backgroundColor:"white",borderRadius:8},children:[r.jsx(o,{level:2,children:"测试页面"}),r.jsx("p",{children:"这是一个测试页面，用于检查应用是否能正常渲染。"})]});export{d as default};

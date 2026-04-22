@@ -258,6 +258,8 @@ const router = createBrowserRouter([
       }
     ]
   }
-]);
+], {
+  basename: '/laodongzhongcai'
+});
 
 export default router;

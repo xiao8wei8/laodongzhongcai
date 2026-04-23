@@ -9,7 +9,8 @@
     "start:dev": "DB_ENV=development npm start",
     "start:prod": "DB_ENV=production npm start",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "backup": "node scripts/backup.js"
+    "backup": "node scripts/backup.js",
+    "init:admin": "ts-node scripts/initAdmin.ts"
   },
   "keywords": [],
   "author": "",

@@ -19,7 +19,7 @@ class SocketService {
         // 生产环境：通过相对路径，使用nginx代理
         socketUrl = '';
         socketOptions = {
-          path: '/socket.io',
+          path: '/laodongzhongcai/socket.io',
           transports: ['websocket', 'polling'],
           autoConnect: true,
         };

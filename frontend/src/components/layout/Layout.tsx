@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import useAuthStore from '../../store/authStore';
 import api from '../../services/api';
+import socketService from '../../services/socketService';
 import { io, Socket } from 'socket.io-client';
 import { DashboardOutlined, FileSearchOutlined, FileAddOutlined, UserAddOutlined, BellOutlined, BarChartOutlined, LogoutOutlined, UserOutlined, SettingOutlined, CalendarOutlined, CheckCircleOutlined, MenuOutlined, BankOutlined, BuildOutlined, TeamOutlined, FileTextOutlined } from '@ant-design/icons';
 
@@ -86,32 +87,30 @@ const Layout: React.FC = () => {
   // 初始化Socket连接
   useEffect(() => {
     if (userInfo) {
-      const newSocket = io('http://localhost:5002', {
-        transports: ['websocket']
-      });
+      const socket = socketService.connect();
 
       // 连接成功后加入用户房间
-      newSocket.on('connect', () => {
-        newSocket.emit('joinUserRoom', userInfo.id);
+      socket.on('connect', () => {
+        socket.emit('joinUserRoom', userInfo.id);
       });
 
       // 监听弹窗通知
-      newSocket.on('popupNotification', (data: { content: string; messageId: string }) => {
+      socket.on('popupNotification', (data: { content: string; messageId: string }) => {
         setNotification(data);
         setVisible(true);
         fetchUnreadCount();
       });
 
       // 监听新消息
-      newSocket.on('newMessage', () => {
+      socket.on('newMessage', () => {
         fetchUnreadCount();
       });
 
-      setSocket(newSocket);
+      setSocket(socket);
 
       // 组件卸载时断开连接
       return () => {
-        newSocket.disconnect();
+        socketService.disconnect();
       };
     }
   }, [userInfo]);

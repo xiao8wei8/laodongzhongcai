@@ -153,7 +153,9 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const { logout } = useAuthStore.getState();
       logout();
-      window.location.href = '/login';
+      // 考虑 basename 路径
+      const basename = '/laodongzhongcai';
+      window.location.href = `${basename}/login`;
     }
     return Promise.reject(error);
   }

@@ -1,0 +1,11 @@
+# MongoDB 备份定时任务
+# 劳动仲裁调解系统数据库备份
+
+# 每天凌晨2点执行数据库备份
+0 2 * * * /root/laodongzhongcai/backend/scripts/auto-backup.sh >> /root/laodongzhongcai/backups/backup_cron.log 2>&1
+
+# 每周日凌晨3点执行全量备份
+0 3 * * 0 /root/laodongzhongcai/backend/scripts/auto-backup.sh >> /root/laodongzhongcai/backups/backup_cron.log 2>&1
+
+# 每天早上8点检查数据量并记录
+0 8 * * * /root/laodongzhongcai/backend/scripts/check-data-count.sh >> /root/laodongzhongcai/backups/data_check.log 2>&1

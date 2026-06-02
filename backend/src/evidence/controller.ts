@@ -1,13 +1,14 @@
 import express from 'express';
-import Evidence from '../models/Evidence';
-import Case from '../models/Case';
-import VisitorRecord from '../models/VisitorRecord';
 import { auth } from '../middleware/auth';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import FileRecognizer from '../services/FileRecognitionService';
 import config from '../config';
+import { v4 as uuidv4 } from 'uuid';
+import evidenceRepository from '../repositories/evidenceRepository';
+import caseRepository from '../repositories/caseRepository';
+import visitorRecordRepository from '../repositories/visitorRecordRepository';
 
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, '../../uploads');
@@ -28,6 +29,32 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// 解析案件ID的辅助函数
+const resolveCaseId = async (caseId: string): Promise<string> => {
+  if (caseId === 'broadcast') {
+    return 'broadcast';
+  }
+  
+  // 检查是否是UUID格式
+  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(caseId)) {
+    return caseId;
+  }
+  
+  // 尝试按案件编号查询正式案件
+  const caseData = await caseRepository.findByCaseNumber(caseId);
+  if (caseData) {
+    return caseData.id;
+  }
+  
+  // 尝试按登记编号查询到访登记
+  const visitorRecord = await visitorRecordRepository.findByRegisterNumber(caseId);
+  if (visitorRecord) {
+    return visitorRecord.id;
+  }
+  
+  return caseId;
+};
+
 // 上传证据
 export const uploadEvidence = [
   auth,
@@ -45,25 +72,8 @@ export const uploadEvidence = [
         return res.status(400).json({ message: '请提供案件ID' });
       }
       
-      // 检查是否是广播附件上传
-      if (caseId === 'broadcast') {
-        // 对于广播附件，直接使用'broadcast'作为caseId
-      } else {
-        // 检查caseId是否是有效的ObjectId
-        if (!isValidObjectId(caseId)) {
-          // 尝试按案件编号查询正式案件
-          const caseData = await Case.findOne({ caseNumber: caseId });
-          if (caseData) {
-            caseId = caseData._id.toString();
-          } else {
-            // 尝试按登记编号查询到访登记
-            const visitorRecord = await VisitorRecord.findOne({ registerNumber: caseId });
-            if (visitorRecord) {
-              caseId = visitorRecord._id.toString();
-            }
-          }
-        }
-      }
+      // 解析案件ID
+      caseId = await resolveCaseId(caseId);
 
       // 确定文件类型
       const ext = path.extname(req.file.originalname).toLowerCase();
@@ -76,44 +86,38 @@ export const uploadEvidence = [
         fileType = 'word';
       }
 
-      const evidence = new Evidence({
+      const evidence = await evidenceRepository.create({
+        id: uuidv4(),
         caseId,
         name: req.file.originalname,
         type: fileType,
         path: req.file.path,
         size: req.file.size,
-        uploaderId: req.user?.id
+        uploaderId: req.user?.id as string
       });
-
-      await evidence.save();
 
       res.status(201).json({ 
         success: true,
         evidence: {
-          id: evidence._id,
+          id: evidence.id,
           caseId: evidence.caseId,
           name: evidence.name,
           type: evidence.type,
           size: evidence.size,
           uploaderId: evidence.uploaderId,
-          uploadTime: evidence.uploadTime
+          uploadTime: evidence.createdAt
         }
       });
     } catch (error) {
       console.error('上传证据失败:', error);
       // 清理文件
       if (req.file) {
-        fs.unlinkSync(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch {}
       }
       res.status(500).json({ message: '服务器内部错误' });
     }
   }
 ];
-
-// 检查字符串是否是有效的ObjectId
-const isValidObjectId = (id: string) => {
-  return /^[0-9a-fA-F]{24}$/.test(id);
-};
 
 // 获取案件证据
 export const getCaseEvidence = [
@@ -122,22 +126,10 @@ export const getCaseEvidence = [
     try {
       let { caseId } = req.params;
       
-      // 检查caseId是否是有效的ObjectId
-      if (!isValidObjectId(caseId)) {
-        // 尝试按案件编号查询正式案件
-        const caseData = await Case.findOne({ caseNumber: caseId });
-        if (caseData) {
-          caseId = caseData._id.toString();
-        } else {
-          // 尝试按登记编号查询到访登记
-          const visitorRecord = await VisitorRecord.findOne({ registerNumber: caseId });
-          if (visitorRecord) {
-            caseId = visitorRecord._id.toString();
-          }
-        }
-      }
+      // 解析案件ID
+      caseId = await resolveCaseId(caseId);
       
-      const evidence = await Evidence.find({ caseId }).populate('uploaderId', 'name');
+      const evidence = await evidenceRepository.findByCaseIdWithRelations(caseId);
       res.json({ evidences: evidence });
     } catch (error) {
       console.error('获取证据失败:', error);
@@ -152,7 +144,7 @@ export const getEvidenceDetail = [
   async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
-      const evidence = await Evidence.findById(id).populate('uploaderId', 'name');
+      const evidence = await evidenceRepository.findById(id);
       if (!evidence) {
         return res.status(404).json({ message: '证据不存在' });
       }
@@ -170,17 +162,17 @@ export const deleteEvidence = [
   async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
-      const evidence = await Evidence.findById(id);
+      const evidence = await evidenceRepository.findById(id);
       if (!evidence) {
         return res.status(404).json({ message: '证据不存在' });
       }
 
       // 删除文件
-      if (fs.existsSync(evidence.path)) {
-        fs.unlinkSync(evidence.path);
+      if (evidence.path && fs.existsSync(evidence.path)) {
+        try { fs.unlinkSync(evidence.path); } catch {}
       }
 
-      await evidence.deleteOne();
+      await evidenceRepository.delete(id);
       res.json({ success: true });
     } catch (error) {
       console.error('删除证据失败:', error);
@@ -206,25 +198,8 @@ export const recognizeEvidence = [
         return res.status(400).json({ message: '请提供案件ID' });
       }
       
-      // 检查是否是广播附件上传
-      if (caseId === 'broadcast') {
-        // 对于广播附件，直接使用'broadcast'作为caseId
-      } else {
-        // 检查caseId是否是有效的ObjectId
-        if (!isValidObjectId(caseId)) {
-          // 尝试按案件编号查询正式案件
-          const caseData = await Case.findOne({ caseNumber: caseId });
-          if (caseData) {
-            caseId = caseData._id.toString();
-          } else {
-            // 尝试按登记编号查询到访登记
-            const visitorRecord = await VisitorRecord.findOne({ registerNumber: caseId });
-            if (visitorRecord) {
-              caseId = visitorRecord._id.toString();
-            }
-          }
-        }
-      }
+      // 解析案件ID
+      caseId = await resolveCaseId(caseId);
 
       // 确定文件类型
       const ext = path.extname(req.file.originalname).toLowerCase();
@@ -245,7 +220,8 @@ export const recognizeEvidence = [
       }
 
       // 创建证据记录
-      const evidence = new Evidence({
+      const evidence = await evidenceRepository.create({
+        id: uuidv4(),
         caseId,
         name: req.file.originalname,
         type: fileType,
@@ -254,8 +230,6 @@ export const recognizeEvidence = [
         uploaderId: req.user.id,
         recognitionStatus: 'processing'
       });
-
-      await evidence.save();
 
       // 使用文件识别服务进行识别
       let recognizerConfig: any = {};
@@ -282,24 +256,24 @@ export const recognizeEvidence = [
         const recognitionResult = await recognizer.recognize(req.file.path, fileType);
         
         // 更新证据记录
-        await Evidence.findByIdAndUpdate(evidence._id, {
-          recognizedContent: recognitionResult.content,
-          recognizedKeyInfo: recognitionResult.keyInfo,
-          recognitionStatus: 'completed',
-          recognitionTime: new Date()
-        });
+        await evidenceRepository.updateRecognitionStatus(
+          evidence.id, 
+          'completed', 
+          recognitionResult.content, 
+          recognitionResult.keyInfo
+        );
 
         // 返回识别结果
         res.status(201).json({ 
           success: true,
           evidence: {
-            id: evidence._id,
+            id: evidence.id,
             caseId: evidence.caseId,
             name: evidence.name,
             type: evidence.type,
             size: evidence.size,
             uploaderId: evidence.uploaderId,
-            uploadTime: evidence.uploadTime,
+            uploadTime: evidence.createdAt,
             recognitionStatus: 'completed'
           },
           recognizedContent: recognitionResult.content
@@ -307,25 +281,21 @@ export const recognizeEvidence = [
       } catch (error) {
         console.error('文件识别失败:', error);
         // 更新为失败状态
-        await Evidence.findByIdAndUpdate(evidence._id, {
-          recognitionStatus: 'failed',
-          recognitionTime: new Date()
-        });
+        await evidenceRepository.updateRecognitionStatus(evidence.id, 'failed');
         
         // 返回失败结果
         res.status(201).json({ 
           success: true,
           evidence: {
-            id: evidence._id,
+            id: evidence.id,
             caseId: evidence.caseId,
             name: evidence.name,
             type: evidence.type,
             size: evidence.size,
             uploaderId: evidence.uploaderId,
-            uploadTime: evidence.uploadTime,
+            uploadTime: evidence.createdAt,
             recognitionStatus: 'failed'
           },
-          // 模拟识别结果，实际应用中会在后台处理完成后返回
           recognizedContent: `从文件 ${req.file.originalname} 中提取的文本内容示例。这是一个模拟的文本提取结果，实际应用中会从文件中真实提取内容。`
         });
       }
@@ -333,7 +303,7 @@ export const recognizeEvidence = [
       console.error('文件识别失败:', error);
       // 清理文件
       if (req.file) {
-        fs.unlinkSync(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch {}
       }
       res.status(500).json({ message: '服务器内部错误' });
     }
@@ -346,14 +316,14 @@ export const getRecognitionResult = [
   async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
-      const evidence = await Evidence.findById(id);
+      const evidence = await evidenceRepository.findById(id);
       if (!evidence) {
         return res.status(404).json({ message: '证据不存在' });
       }
 
       res.json({
         evidence: {
-          id: evidence._id,
+          id: evidence.id,
           name: evidence.name,
           recognitionStatus: evidence.recognitionStatus,
           recognizedContent: evidence.recognizedContent,
@@ -374,15 +344,13 @@ export const reRecognizeEvidence = [
   async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
-      const evidence = await Evidence.findById(id);
+      const evidence = await evidenceRepository.findById(id);
       if (!evidence) {
         return res.status(404).json({ message: '证据不存在' });
       }
 
       // 更新状态为处理中
-      await Evidence.findByIdAndUpdate(id, {
-        recognitionStatus: 'processing'
-      });
+      await evidenceRepository.updateRecognitionStatus(id, 'processing');
 
       // 使用文件识别服务进行重新识别
       let recognizerConfig: any = {};
@@ -409,12 +377,12 @@ export const reRecognizeEvidence = [
         const recognitionResult = await recognizer.recognize(evidence.path, evidence.type);
         
         // 更新证据记录
-        await Evidence.findByIdAndUpdate(id, {
-          recognizedContent: recognitionResult.content,
-          recognizedKeyInfo: recognitionResult.keyInfo,
-          recognitionStatus: 'completed',
-          recognitionTime: new Date()
-        });
+        await evidenceRepository.updateRecognitionStatus(
+          id, 
+          'completed', 
+          recognitionResult.content, 
+          recognitionResult.keyInfo
+        );
 
         res.json({ 
           success: true,
@@ -424,10 +392,7 @@ export const reRecognizeEvidence = [
       } catch (error) {
         console.error('文件重新识别失败:', error);
         // 更新为失败状态
-        await Evidence.findByIdAndUpdate(id, {
-          recognitionStatus: 'failed',
-          recognitionTime: new Date()
-        });
+        await evidenceRepository.updateRecognitionStatus(id, 'failed');
         
         res.json({ 
           success: false,

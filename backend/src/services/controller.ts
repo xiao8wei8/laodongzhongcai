@@ -1,9 +1,9 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import { exec, spawn } from 'child_process';
 import path from 'path';
 import axios from 'axios';
 import config from '../config';
+import pool from '../config/mysql';
 import { io } from '../server';
 
 // 服务进程管理
@@ -13,9 +13,15 @@ const serviceProcesses: Record<string, any> = {};
 export const checkServiceStatus = [
   async (req: express.Request, res: express.Response) => {
     try {
-      // 检查 MongoDB 连接状态
-      const mongoStatus = mongoose.connection.readyState;
-      const mongoConnected = mongoStatus === 1;
+      // 检查 MySQL 连接状态
+      let mysqlConnected = false;
+      try {
+        await pool.query('SELECT 1');
+        mysqlConnected = true;
+      } catch (error) {
+        console.error('MySQL 连接检查失败:', error);
+        mysqlConnected = false;
+      }
 
       // 检查后端服务状态
       const backendStatus = 'running';
@@ -114,8 +120,9 @@ export const checkServiceStatus = [
 
       // 获取数据库环境信息
       const dbEnv = process.env.DB_ENV || 'development';
-      const mongoUri = process.env.MONGO_URI_DEV || 'mongodb://localhost:27017/laodong';
-      const prodMongoUri = process.env.MONGO_URI_PROD || 'mongodb://152.136.175.14:27017';
+      const mysqlHost = process.env.MYSQL_HOST || '152.136.175.14';
+      const mysqlPort = process.env.MYSQL_PORT || '3306';
+      const mysqlDatabase = process.env.MYSQL_DATABASE || 'laodongzhongcai';
 
       // 构建服务状态响应
       const serviceStatus = {
@@ -124,9 +131,9 @@ export const checkServiceStatus = [
           message: '后端服务运行正常',
           timestamp: new Date().toISOString()
         },
-        mongodb: {
-          status: mongoConnected ? 'connected' : 'disconnected',
-          message: mongoConnected ? 'MongoDB 连接正常' : 'MongoDB 连接失败',
+        mysql: {
+          status: mysqlConnected ? 'connected' : 'disconnected',
+          message: mysqlConnected ? 'MySQL 连接正常' : 'MySQL 连接失败',
           timestamp: new Date().toISOString()
         },
         frontend: {
@@ -153,7 +160,9 @@ export const checkServiceStatus = [
           status: 'configured',
           message: `当前环境: ${dbEnv === 'production' ? '生产环境' : '开发环境'}`,
           dbEnv: dbEnv,
-          mongoUri: dbEnv === 'production' ? prodMongoUri : mongoUri,
+          mysqlHost,
+          mysqlPort,
+          mysqlDatabase,
           timestamp: new Date().toISOString()
         }
       };

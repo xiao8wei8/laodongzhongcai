@@ -1,5 +1,6 @@
 import express from 'express';
-import Notification from '../models/Notification';
+import { v4 as uuidv4 } from 'uuid';
+import notificationRepository from '../repositories/notificationRepository';
 import { auth } from '../middleware/auth';
 import smsService from '../services/smsService';
 import emailService from '../services/emailService';
@@ -16,29 +17,20 @@ export const sendNotification = [
       }
 
       // 创建通知记录
-      const notification = new Notification({
+      const notification = await notificationRepository.create({
+        id: uuidv4(),
         userId,
         type,
+        title: content.substring(0, 50),
         content,
-        status: 'unread'
-      });
-
-      await notification.save();
+        isRead: false,
+        createdAt: new Date()
+      } as any);
 
       // 根据类型发送不同的通知
       if (type === 'sms') {
-        // 这里需要获取用户的手机号
-        // const user = await User.findById(userId);
-        // if (user?.phone) {
-        //   await smsService.sendNotification(user.phone, content);
-        // }
         console.log('发送短信通知:', content);
       } else if (type === 'email') {
-        // 这里需要获取用户的邮箱
-        // const user = await User.findById(userId);
-        // if (user?.email) {
-        //   await emailService.sendNotification(user.email, content);
-        // }
         console.log('发送邮件通知:', content);
       }
 
@@ -56,19 +48,18 @@ export const getNotifications = [
   async (req: express.Request, res: express.Response) => {
     try {
       const userId = req.user?.id;
-      const { status, page = 1, limit = 10 } = req.query;
-
-      const query: any = { userId };
-      if (status) {
-        query.status = status;
-      }
-
-      const notifications = await Notification.find(query)
-        .sort({ created_at: -1 })
-        .skip((Number(page) - 1) * Number(limit))
-        .limit(Number(limit));
-
-      const total = await Notification.countDocuments(query);
+      const { page = 1, limit = 10 } = req.query;
+      
+      // 简单实现：获取用户的所有通知，然后进行分页
+      const allNotifications = await notificationRepository.findByUser(userId!);
+      
+      // 按创建时间倒序排序
+      allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // 应用分页
+      const startIndex = (Number(page) - 1) * Number(limit);
+      const notifications = allNotifications.slice(startIndex, startIndex + Number(limit));
+      const total = allNotifications.length;
 
       res.json({
         notifications,
@@ -92,7 +83,7 @@ export const getUnreadCount = [
   async (req: express.Request, res: express.Response) => {
     try {
       const userId = req.user?.id;
-      const count = await Notification.countDocuments({ userId, status: 'unread' });
+      const count = await notificationRepository.countUnreadNotifications(userId!);
       res.json({ unreadCount: count });
     } catch (error) {
       console.error('获取未读通知数量失败:', error);
@@ -109,16 +100,15 @@ export const markAsRead = [
       const { id } = req.params;
       const userId = req.user?.id;
 
-      const notification = await Notification.findOne({ _id: id, userId });
-      if (!notification) {
+      // 先检查通知是否属于该用户
+      const notification = await notificationRepository.findById(id);
+      if (!notification || notification.userId !== userId) {
         return res.status(404).json({ message: '通知不存在' });
       }
 
-      notification.status = 'read';
-      notification.read_at = new Date();
-      await notification.save();
+      const updatedNotification = await notificationRepository.markAsRead(id);
 
-      res.json({ success: true, notification });
+      res.json({ success: true, notification: updatedNotification });
     } catch (error) {
       console.error('标记通知已读失败:', error);
       res.status(500).json({ message: '服务器内部错误' });
@@ -133,10 +123,7 @@ export const markAllAsRead = [
     try {
       const userId = req.user?.id;
 
-      await Notification.updateMany(
-        { userId, status: 'unread' },
-        { $set: { status: 'read', read_at: new Date() } }
-      );
+      await notificationRepository.markAllAsRead(userId!);
 
       res.json({ success: true });
     } catch (error) {

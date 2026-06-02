@@ -1,5 +1,8 @@
 import express from 'express';
-import VisitorRecord from '../models/VisitorRecord';
+import { v4 as uuidv4 } from 'uuid';
+import visitorRecordRepository from '../repositories/visitorRecordRepository';
+import userRepository from '../repositories/userRepository';
+import pool from '../config/mysql';
 import smsService from '../services/smsService';
 import jwt from 'jsonwebtoken';
 import config from '../config';
@@ -18,12 +21,12 @@ const generateRegisterNumber = async () => {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   
-  const todayCount = await VisitorRecord.countDocuments({
-    createdAt: {
-      $gte: today,
-      $lt: tomorrow
-    }
-  });
+  const [countResult] = await pool.query(
+    `SELECT COUNT(*) as count FROM visitor_records WHERE createdAt >= ? AND createdAt < ?`,
+    [today, tomorrow]
+  );
+  
+  const todayCount = (countResult as any)[0].count;
   
   // 生成序号（当天记录数+1，格式化为3位）
   const sequence = String(todayCount + 1).padStart(3, '0');
@@ -49,29 +52,28 @@ export const createVisitorRecord = async (req: express.Request, res: express.Res
     const registerNumber = await generateRegisterNumber();
     
     // 创建到访记录
-    const visitorRecord = new VisitorRecord({
+    const visitorRecord = await visitorRecordRepository.create({
+      id: uuidv4(),
       registerNumber,
       visitorName,
       phone,
-      visitType,
+      visitType: visitType as any,
       disputeType,
       reason,
       sendSmsVerification: isSmsVerification,
       sendEmailVerification: isEmailVerification,
       email,
-      mediatorId: req.user?.id
+      mediatorId: req.user?.id,
+      status: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
     
-    await visitorRecord.save();
-    
-    // 强制重新获取记录，确保包含所有字段
-    const savedRecord = await VisitorRecord.findById(visitorRecord._id).populate('mediatorId', 'name');
-    
-    // 转换为普通对象，确保所有字段都被包含
-    const recordObject = savedRecord?.toObject();
+    // 获取关联数据
+    const savedRecord = await visitorRecordRepository.findWithRelations(visitorRecord.id);
     
     res.status(201).json({ 
-      record: recordObject, 
+      record: savedRecord, 
       registerNumber 
     });
   } catch (error) {
@@ -84,42 +86,40 @@ export const createVisitorRecord = async (req: express.Request, res: express.Res
 export const getVisitorRecords = async (req: express.Request, res: express.Response) => {
   try {
     const { page = 1, limit = 10, visitorName, phone } = req.query;
-    const query: any = {};
     
-    // 根据用户角色过滤
-    if (req.user?.role === 'mediator') {
-      query.mediatorId = req.user.id;
-    }
+    // 根据用户角色和过滤条件获取记录
+    const result = await visitorRecordRepository.paginateRecords(
+      Number(page), 
+      Number(limit)
+    );
+    
+    let filteredRecords = result.records;
     
     // 根据姓名和电话过滤
     if (visitorName) {
-      query.visitorName = { $regex: visitorName, $options: 'i' };
+      filteredRecords = filteredRecords.filter(record => 
+        record.visitorName.toLowerCase().includes((visitorName as string).toLowerCase())
+      );
     }
     
     if (phone) {
-      query.phone = { $regex: phone, $options: 'i' };
+      filteredRecords = filteredRecords.filter(record => 
+        record.phone.includes(phone as string)
+      );
     }
     
-    // 计算分页
-    const skip = (Number(page) - 1) * Number(limit);
-    
-    // 获取记录总数
-    const total = await VisitorRecord.countDocuments(query);
-    
-    // 获取记录列表
-    const records = await VisitorRecord.find(query)
-      .populate('mediatorId', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+    // 根据用户角色过滤
+    if (req.user?.role === 'mediator') {
+      filteredRecords = filteredRecords.filter(record => record.mediatorId === req.user!.id);
+    }
     
     res.json({
-      records,
+      records: filteredRecords,
       pagination: {
-        total,
+        total: result.total,
         page: Number(page),
         limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
+        pages: Math.ceil(result.total / Number(limit))
       }
     });
   } catch (error) {
@@ -133,14 +133,14 @@ export const getVisitorRecordById = async (req: express.Request, res: express.Re
   try {
     const recordId = req.params.id;
     
-    const record = await VisitorRecord.findById(recordId).populate('mediatorId', 'name');
+    const record = await visitorRecordRepository.findWithRelations(recordId);
     
     if (!record) {
       return res.status(404).json({ message: '到访记录不存在' });
     }
     
     // 检查权限
-    if (req.user?.role === 'mediator' && record.mediatorId?._id.toString() !== req.user.id) {
+    if (req.user?.role === 'mediator' && record.mediatorId !== req.user.id) {
       return res.status(403).json({ message: '权限不足' });
     }
     
@@ -159,21 +159,18 @@ export const getTodayVisitorRecords = async (req: express.Request, res: express.
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    const query: any = {
-      createdAt: {
-        $gte: today,
-        $lt: tomorrow
-      }
-    };
+    // 获取所有记录并过滤今天的
+    const allRecords = await visitorRecordRepository.findAllWithRelations();
+    
+    let records = allRecords.filter(record => {
+      const recordDate = new Date(record.createdAt);
+      return recordDate >= today && recordDate < tomorrow;
+    });
     
     // 根据用户角色过滤
     if (req.user?.role === 'mediator') {
-      query.mediatorId = req.user.id;
+      records = records.filter(record => record.mediatorId === req.user!.id);
     }
-    
-    const records = await VisitorRecord.find(query)
-      .populate('mediatorId', 'name')
-      .sort({ createdAt: -1 });
     
     res.json({ records });
   } catch (error) {
@@ -192,7 +189,7 @@ export const sendSmsLink = async (req: express.Request, res: express.Response) =
     }
     
     // 查找到访记录
-    const record = await VisitorRecord.findById(recordId);
+    const record = await visitorRecordRepository.findById(recordId);
     if (!record) {
       return res.status(404).json({ message: '到访记录不存在' });
     }
@@ -200,7 +197,7 @@ export const sendSmsLink = async (req: express.Request, res: express.Response) =
     // 生成加密token
     const token = jwt.sign(
       {
-        recordId: record._id,
+        recordId: record.id,
         phone: record.phone,
         visitorName: record.visitorName,
         timestamp: Date.now()

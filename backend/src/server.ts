@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import http from 'http';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
+import pool from './config/mysql';
 
 // 导入路由
 import authRoutes from './auth/routes';
@@ -31,7 +31,7 @@ const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.en
 dotenv.config({ path: envFile });
 
 const app = express();
-const PORT = process.env.PORT || 5002;
+const PORT = process.env.PORT || 5003;
 
 // 中间件配置
 app.use(cors());
@@ -50,119 +50,14 @@ app.get('/api/docs.json', (req, res) => {
   res.json(swaggerSpec);
 });
 
-// 测试调教员123的数据
-app.get('/api/test/mediator123', async (req, res) => {
+// 测试数据库连接
+app.get('/api/test/db', async (req, res) => {
   try {
-    const mediatorId = '69a9a6d917bcb1d9978a5222';
-    const Case = require('./models/Case').default;
-    const VisitorRecord = require('./models/VisitorRecord').default;
-    
-    // 查询调教员123的正式案件
-    const cases: any[] = await Case.find({ mediatorId });
-    console.log('调教员123的正式案件:', cases.length, cases.map((c: any) => c.caseNumber));
-    
-    // 查询调教员123的到访登记
-    const visitors: any[] = await VisitorRecord.find({ mediatorId });
-    console.log('调教员123的到访登记:', visitors.length, visitors.map((v: any) => v.registerNumber));
-    
-    // 计算总数
-    const total = cases.length + visitors.length;
-    console.log('调教员123的总案件数:', total);
-    
-    res.json({
-      cases: cases.length,
-      visitors: visitors.length,
-      total: total,
-      caseNumbers: cases.map((c: any) => c.caseNumber),
-      visitorNumbers: visitors.map((v: any) => v.registerNumber)
-    });
+    const [rows] = await pool.query('SELECT 1 as test');
+    res.json({ status: 'ok', mysql: 'connected', data: rows });
   } catch (error) {
-    console.error('测试错误:', error);
-    res.status(500).json({ message: '服务器内部错误' });
-  }
-});
-
-// 测试工作台数据
-app.get('/api/test/dashboard', async (req, res) => {
-  try {
-    const mediatorId = '69a9a6d917bcb1d9978a5222';
-    const Case = require('./models/Case').default;
-    const VisitorRecord = require('./models/VisitorRecord').default;
-    
-    const caseQuery: any = { mediatorId };
-    const visitorQuery: any = { mediatorId };
-    
-    console.log('Dashboard stats query:', {
-      userId: mediatorId,
-      role: 'mediator',
-      caseQuery,
-      visitorQuery
-    });
-    
-    // 获取案件总数
-    const totalCases = await Case.countDocuments(caseQuery);
-    const totalVisitors = await VisitorRecord.countDocuments(visitorQuery);
-    const total = totalCases + totalVisitors;
-    
-    console.log('Dashboard stats counts:', {
-      totalCases,
-      totalVisitors,
-      total
-    });
-    
-    // 调试：直接查询调解员123的案件和到访记录
-    console.log('=== 调教员123数据调试 ===');
-    const mediatorCases = await Case.find({ mediatorId });
-    console.log('调教员123的正式案件:', mediatorCases.length, mediatorCases.map((c: any) => c.caseNumber));
-    
-    const mediatorVisitors = await VisitorRecord.find({ mediatorId });
-    console.log('调教员123的到访登记:', mediatorVisitors.length, mediatorVisitors.map((v: any) => v.registerNumber));
-    
-    // 获取各状态案件数量
-    const pendingCases = await Case.countDocuments({ ...caseQuery, status: 'pending' }) + 
-                        await VisitorRecord.countDocuments({ ...visitorQuery });
-    const processingCases = await Case.countDocuments({ ...caseQuery, status: 'processing' });
-    const completedCases = await Case.countDocuments({ ...caseQuery, status: 'completed' });
-    const failedCases = await Case.countDocuments({ ...caseQuery, status: 'failed' });
-    
-    console.log('Dashboard status counts:', {
-      pendingCases,
-      processingCases,
-      completedCases,
-      failedCases
-    });
-    
-    // 获取今日到访记录数
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const todayVisitors = await VisitorRecord.countDocuments({
-      ...visitorQuery,
-      createdAt: {
-        $gte: today,
-        $lt: tomorrow
-      }
-    });
-    
-    console.log('Dashboard today visitors:', todayVisitors);
-    
-    const stats = {
-      totalCases: total,
-      pendingCases,
-      processingCases,
-      completedCases,
-      failedCases,
-      todayVisitors
-    };
-    
-    console.log('调教员123的工作台数据:', stats);
-    
-    res.json(stats);
-  } catch (error) {
-    console.error('测试工作台数据错误:', error);
-    res.status(500).json({ message: '服务器内部错误' });
+    console.error('数据库测试失败:', error);
+    res.status(500).json({ status: 'error', message: '数据库连接失败' });
   }
 });
 
@@ -193,24 +88,20 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ message: '服务器内部错误' });
 });
 
-// 数据库连接 - 根据环境变量选择数据库
-const dbEnv = process.env.DB_ENV || 'development';
-let mongoUri = '';
-if (dbEnv === 'production') {
-  mongoUri = process.env.MONGO_URI_PROD || 'mongodb://152.136.175.14:27017/laodong';
-  console.log('使用生产环境数据库:', mongoUri);
-} else {
-  mongoUri = process.env.MONGO_URI_DEV || 'mongodb://localhost:27017/laodong';
-  console.log('使用开发环境数据库:', mongoUri);
-}
+// 数据库连接 - MySQL
+const initDatabase = async () => {
+  try {
+    // 测试连接
+    await pool.query('SELECT 1');
+    console.log('MySQL连接成功');
+  } catch (error) {
+    console.error('MySQL连接失败:', error);
+    process.exit(1);
+  }
+};
 
-mongoose.connect(mongoUri)
-  .then(() => {
-    console.log('MongoDB连接成功');
-  })
-  .catch((error) => {
-    console.error('MongoDB连接失败:', error);
-  });
+// 初始化数据库
+initDatabase();
 
 // 创建HTTP服务器
 const server = http.createServer(app);

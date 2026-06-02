@@ -1,7 +1,9 @@
 import express from 'express';
-import Case from '../models/Case';
-import CaseProgress from '../models/CaseProgress';
-import User from '../models/User';
+import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
+import caseRepository from '../repositories/caseRepository';
+import userRepository from '../repositories/userRepository';
+import caseProgressRepository from '../repositories/caseProgressRepository';
 
 // 生成案件编号
 const generateCaseNumber = () => {
@@ -34,7 +36,7 @@ export const createApplication = async (req: express.Request, res: express.Respo
     const caseNumber = generateCaseNumber();
 
     // 创建申请人（如果不存在）
-    let applicantId;
+    let applicantId = '';
     console.log('创建申请人前的信息:', applicantInfo);
     console.log('当前登录用户:', req.user);
     
@@ -45,26 +47,23 @@ export const createApplication = async (req: express.Request, res: express.Respo
     } 
     // 如果用户未登录，检查表单数据并创建新用户
     else if (applicantInfo && applicantInfo.phone) {
-      const existingApplicant = await User.findOne({ phone: applicantInfo.phone });
+      const existingApplicant = await userRepository.findByPhone(applicantInfo.phone);
       if (existingApplicant) {
-        applicantId = existingApplicant._id;
+        applicantId = existingApplicant.id;
       } else {
-        const applicant = new User({
+        const applicant = await userRepository.create({
+          id: uuidv4(),
           username: `user_${Date.now()}`,
-          password: '123456', // 默认密码
+          password: await bcrypt.hash('123456', 10),
           name: applicantInfo.name || '',
           phone: applicantInfo.phone || '',
           email: applicantInfo.email,
           role: 'personal',
           idCard: applicantInfo.idCard,
           position: '申请人',
-          officePhone: applicantInfo.phone || '',
-          street: '默认街道',
-          department: '默认部门'
-        });
+        } as any);
         console.log('创建的申请人:', applicant);
-        await applicant.save();
-        applicantId = applicant._id;
+        applicantId = applicant.id;
       }
     } else {
       console.error('申请人信息不完整');
@@ -72,29 +71,26 @@ export const createApplication = async (req: express.Request, res: express.Respo
     }
 
     // 创建被申请人（如果不存在）
-    let respondentId;
+    let respondentId = '';
     console.log('创建被申请人前的信息:', respondentInfo);
     if (respondentInfo && respondentInfo.phone) {
-      const existingRespondent = await User.findOne({ phone: respondentInfo.phone });
+      const existingRespondent = await userRepository.findByPhone(respondentInfo.phone);
       if (existingRespondent) {
-        respondentId = existingRespondent._id;
+        respondentId = existingRespondent.id;
       } else {
-        const respondent = new User({
+        const respondent = await userRepository.create({
+          id: uuidv4(),
           username: `user_${Date.now()}_resp`,
-          password: '123456', // 默认密码
+          password: await bcrypt.hash('123456', 10),
           name: respondentInfo.name || '',
           phone: respondentInfo.phone || '',
           email: respondentInfo.email,
           role: respondentInfo.type === 'company' ? 'company' : 'personal',
           idCard: respondentInfo.idCard,
           position: respondentInfo.type === 'company' ? '企业代表' : '个人',
-          officePhone: respondentInfo.phone || '',
-          street: '默认街道',
-          department: '默认部门'
-        });
+        } as any);
         console.log('创建的被申请人:', respondent);
-        await respondent.save();
-        respondentId = respondent._id;
+        respondentId = respondent.id;
       }
     } else {
       console.error('被申请人信息不完整');
@@ -102,28 +98,26 @@ export const createApplication = async (req: express.Request, res: express.Respo
     }
 
     // 创建案件
-    const newCase = new Case({
+    const newCase = await caseRepository.create({
+      id: uuidv4(),
       caseNumber,
       applicantId,
       respondentId,
       disputeType,
-      caseAmount,
+      caseAmount: caseAmount ? parseFloat(caseAmount) : undefined,
       requestItems,
       factsReasons,
-      status: 'pending'
+      status: 'pending' as any,
     });
-
-    await newCase.save();
 
     // 创建案件进度记录
-    const progress = new CaseProgress({
-      caseId: newCase._id,
+    await caseProgressRepository.create({
+      id: uuidv4(),
+      caseId: newCase.id,
       content: '案件已申请',
       type: 'register',
-      creatorId: req.user?.id
-    });
-
-    await progress.save();
+      creatorId: req.user?.id || applicantId,
+    } as any);
 
     res.status(201).json({ case: newCase, caseNumber });
   } catch (error) {
@@ -136,27 +130,12 @@ export const createApplication = async (req: express.Request, res: express.Respo
 export const getApplications = async (req: express.Request, res: express.Response) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
-    const query: any = {};
-
-    if (status) {
-      query.status = status;
-    }
-
-    // 计算分页
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // 获取记录总数
-    const total = await Case.countDocuments(query);
-
-    // 获取记录列表
-    const applications = await Case.find(query)
-      .populate(['applicantId', 'respondentId', 'mediatorId'])
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+    const { total, cases } = await caseRepository.paginateCases(
+      Number(page), Number(limit), status as string | undefined
+    );
 
     res.json({
-      applications,
+      applications: cases,
       pagination: {
         total,
         page: Number(page),
@@ -175,8 +154,7 @@ export const getApplicationById = async (req: express.Request, res: express.Resp
   try {
     const applicationId = req.params.id;
 
-    const application = await Case.findById(applicationId)
-      .populate(['applicantId', 'respondentId', 'mediatorId']);
+    const application = await caseRepository.findById(applicationId);
 
     if (!application) {
       return res.status(404).json({ message: '申请不存在' });
@@ -186,17 +164,15 @@ export const getApplicationById = async (req: express.Request, res: express.Resp
     const isAuthorized = 
       req.user?.role === 'admin' ||
       req.user?.role === 'mediator' ||
-      application.applicantId._id.toString() === req.user?.id ||
-      application.respondentId._id.toString() === req.user?.id;
+      application.applicantId === req.user?.id ||
+      application.respondentId === req.user?.id;
 
     if (!isAuthorized) {
       return res.status(403).json({ message: '权限不足' });
     }
 
     // 获取案件进度
-    const progress = await CaseProgress.find({ caseId: applicationId })
-      .populate('creatorId')
-      .sort({ createdAt: 1 });
+    const progress = await caseProgressRepository.findByCaseId(applicationId);
 
     res.json({ application, progress });
   } catch (error) {
@@ -208,19 +184,7 @@ export const getApplicationById = async (req: express.Request, res: express.Resp
 // 保存申请草稿
 export const saveDraft = async (req: express.Request, res: express.Response) => {
   try {
-    const {
-      applicantInfo,
-      respondentInfo,
-      disputeType,
-      caseAmount,
-      requestItems,
-      factsReasons
-    } = req.body;
-
-    // 这里可以将草稿保存到数据库或缓存中
-    // 为了简化，这里直接返回成功
     const draftId = `draft_${Date.now()}`;
-
     res.json({ draftId, success: true });
   } catch (error) {
     console.error('保存草稿错误:', error);
@@ -231,30 +195,14 @@ export const saveDraft = async (req: express.Request, res: express.Response) => 
 // 获取申请草稿
 export const getDraft = async (req: express.Request, res: express.Response) => {
   try {
-    const draftId = req.params.id;
-
-    // 这里可以从数据库或缓存中获取草稿
-    // 为了简化，这里返回模拟数据
     const draft = {
-      applicantInfo: {
-        name: '',
-        phone: '',
-        email: '',
-        idCard: ''
-      },
-      respondentInfo: {
-        name: '',
-        phone: '',
-        email: '',
-        idCard: '',
-        type: 'company'
-      },
+      applicantInfo: { name: '', phone: '', email: '', idCard: '' },
+      respondentInfo: { name: '', phone: '', email: '', idCard: '', type: 'company' },
       disputeType: '',
       caseAmount: 0,
       requestItems: '',
       factsReasons: ''
     };
-
     res.json({ draft });
   } catch (error) {
     console.error('获取草稿错误:', error);

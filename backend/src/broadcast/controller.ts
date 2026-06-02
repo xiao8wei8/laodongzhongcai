@@ -1,6 +1,6 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import Broadcast from '../models/Broadcast';
+import { v4 as uuidv4 } from 'uuid';
+import broadcastRepository from '../repositories/broadcastRepository';
 import { io } from '../server';
 
 // 发布广播
@@ -17,18 +17,17 @@ export const createBroadcast = async (req: express.Request, res: express.Respons
     expireAt.setDate(expireAt.getDate() + expireDays);
     
     // 创建广播
-    const broadcast = new Broadcast({
+    const broadcast = await broadcastRepository.create({
+      id: uuidv4(),
       title,
       content,
       type,
       urgency,
       status: 'pending',
-      creatorId: req.user?.id,
-      attachments,
-      expireAt
-    });
-    
-    await broadcast.save();
+      creatorId: req.user?.id as string,
+      attachments: attachments ? JSON.stringify(attachments) : null,
+      expireAt,
+    } as any);
     
     // 发送实时通知给管理员
     io.emit('newBroadcastPending', broadcast);
@@ -44,56 +43,64 @@ export const createBroadcast = async (req: express.Request, res: express.Respons
 export const getBroadcasts = async (req: express.Request, res: express.Response) => {
   try {
     const { page = 1, limit = 10, type, urgency, status } = req.query;
-    const query: any = {};
-    
-    // 普通用户可以看到自己创建的所有广播（包括待审核和被驳回的）以及所有已通过的广播
-    if (req.user?.role !== 'admin') {
-      const userId = req.user?.id;
-      if (userId) {
-        query.$or = [
-          { status: 'approved' },
-          { creatorId: new mongoose.Types.ObjectId(userId) }
-        ];
-      } else {
-        // 如果没有用户ID，只显示已通过的广播
-        query.status = 'approved';
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    // 根据角色过滤
+    let queryStatus = status as string | undefined;
+    if (userRole !== 'admin' && !status) {
+      // 普通用户可以看到已通过的和自己创建的所有广播
+      // 获取关联数据
+
+      // 手动过滤权限
+      const allBroadcasts = await broadcastRepository.findAllWithRelations();
+      let filteredBroadcasts = allBroadcasts;
+      if (userRole !== 'admin') {
+        filteredBroadcasts = allBroadcasts.filter(b => 
+          b.status === 'approved' || (userId && b.creatorId === userId)
+        );
       }
-    } else if (status) {
-      // 管理员可以按状态筛选
-      query.status = status;
-    }
-    
-    if (type) {
-      query.type = type;
-    }
-    
-    if (urgency) {
-      query.urgency = urgency;
-    }
-    
-    // 计算分页
-    const skip = (Number(page) - 1) * Number(limit);
-    
-    // 获取记录总数
-    const total = await Broadcast.countDocuments(query);
-    
-    // 获取记录列表
-    const broadcasts = await Broadcast.find(query)
-      .populate('creatorId', 'name')
-      .populate('approverId', 'name')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-    
-    res.json({
-      broadcasts,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
+
+      // 应用类型和紧急程度过滤
+      if (type) {
+        filteredBroadcasts = filteredBroadcasts.filter(b => b.type === type);
       }
-    });
+      if (urgency) {
+        filteredBroadcasts = filteredBroadcasts.filter(b => b.urgency === urgency);
+      }
+      if (status) {
+        filteredBroadcasts = filteredBroadcasts.filter(b => b.status === status);
+      }
+
+      // 分页
+      const startIndex = (Number(page) - 1) * Number(limit);
+      const paginatedBroadcasts = filteredBroadcasts.slice(startIndex, startIndex + Number(limit));
+
+      res.json({
+        broadcasts: paginatedBroadcasts,
+        pagination: {
+          total: filteredBroadcasts.length,
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(filteredBroadcasts.length / Number(limit))
+        }
+      });
+    } else {
+      // 管理员或者有明确状态筛选
+      const result = await broadcastRepository.paginateBroadcasts(
+        Number(page), Number(limit), type as string, urgency as string, status as string
+      );
+      
+      res.json({
+        broadcasts: result.broadcasts,
+        pagination: {
+          total: result.total,
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(result.total / Number(limit))
+        }
+      });
+    }
   } catch (error) {
     console.error('获取广播列表错误:', error);
     res.status(500).json({ message: '服务器内部错误' });
@@ -105,9 +112,7 @@ export const getBroadcastById = async (req: express.Request, res: express.Respon
   try {
     const broadcastId = req.params.id;
     
-    const broadcast = await Broadcast.findById(broadcastId)
-      .populate('creatorId', 'name')
-      .populate('approverId', 'name');
+    const broadcast = await broadcastRepository.findById(broadcastId);
     
     if (!broadcast) {
       return res.status(404).json({ message: '广播不存在' });
@@ -115,15 +120,7 @@ export const getBroadcastById = async (req: express.Request, res: express.Respon
     
     // 检查是否需要标记为已读
     if (broadcast.status === 'approved' && req.user?.id) {
-      const userId = req.user.id;
-      const hasRead = broadcast.readBy.some(item => item.userId && item.userId.toString() === userId.toString());
-      if (!hasRead) {
-        broadcast.readBy.push({
-          userId: new mongoose.Types.ObjectId(userId),
-          readAt: new Date()
-        });
-        await broadcast.save();
-      }
+      await broadcastRepository.markAsRead(broadcastId, req.user.id);
     }
     
     res.json({ broadcast });
@@ -136,17 +133,21 @@ export const getBroadcastById = async (req: express.Request, res: express.Respon
 // 获取最新广播
 export const getLatestBroadcasts = async (req: express.Request, res: express.Response) => {
   try {
-    const broadcasts = await Broadcast.find({ status: 'approved' })
-      .populate('creatorId', 'name')
-      .sort({ createdAt: -1 })
-      .limit(5);
+    const broadcasts = await broadcastRepository.findActiveBroadcastsWithRelations();
+    const latest = broadcasts.slice(0, 5);
     
     // 计算未读数量
-    const unreadCount = broadcasts.filter(broadcast => {
-      return !broadcast.readBy.some(item => item.userId && item.userId.toString() === req.user?.id?.toString());
-    }).length;
+    let unreadCount = 0;
+    if (req.user?.id) {
+      for (const b of latest) {
+        const isRead = await broadcastRepository.isReadByUser(b.id, req.user.id);
+        if (!isRead) {
+          unreadCount++;
+        }
+      }
+    }
     
-    res.json({ broadcasts, unreadCount });
+    res.json({ broadcasts: latest, unreadCount });
   } catch (error) {
     console.error('获取最新广播错误:', error);
     res.status(500).json({ message: '服务器内部错误' });
@@ -159,40 +160,45 @@ export const approveBroadcast = async (req: express.Request, res: express.Respon
     const { id } = req.params;
     const { action, reason, content } = req.body;
     
-    const broadcast = await Broadcast.findById(id);
+    const broadcast = await broadcastRepository.findById(id);
     if (!broadcast) {
       return res.status(404).json({ message: '广播不存在' });
     }
     
     if (action === 'approve') {
       // 批准广播
-      broadcast.status = 'approved';
-      broadcast.approverId = req.user?.id ? new mongoose.Types.ObjectId(req.user.id) : undefined;
-      broadcast.approvalTime = new Date();
-      
+      const updateData: any = {
+        status: 'approved',
+        approverId: req.user?.id,
+        approvalTime: new Date(),
+      };
       if (content) {
-        broadcast.content = content;
+        updateData.content = content;
       }
       
-      await broadcast.save();
+      const updated = await broadcastRepository.update(id, updateData);
       
       // 发送实时通知
-      io.emit('broadcastApproved', broadcast);
+      if (updated) {
+        io.emit('broadcastApproved', updated);
+      }
       
-      res.json({ broadcast, success: true, message: '广播已批准' });
+      res.json({ broadcast: updated, success: true, message: '广播已批准' });
     } else if (action === 'reject') {
       // 驳回广播
-      broadcast.status = 'rejected';
-      broadcast.approverId = req.user?.id ? new mongoose.Types.ObjectId(req.user.id) : undefined;
-      broadcast.approvalTime = new Date();
-      broadcast.rejectionReason = reason;
-      
-      await broadcast.save();
+      const updated = await broadcastRepository.update(id, {
+        status: 'rejected',
+        approverId: req.user?.id,
+        approvalTime: new Date(),
+        rejectionReason: reason,
+      } as any);
       
       // 发送实时通知给创建者
-      io.emit('broadcastRejected', broadcast);
+      if (updated) {
+        io.emit('broadcastRejected', updated);
+      }
       
-      res.json({ broadcast, success: true, message: '广播已驳回' });
+      res.json({ broadcast: updated, success: true, message: '广播已驳回' });
     } else {
       res.status(400).json({ message: '无效的操作' });
     }
@@ -205,11 +211,11 @@ export const approveBroadcast = async (req: express.Request, res: express.Respon
 // 获取待审核广播列表
 export const getPendingBroadcasts = async (req: express.Request, res: express.Response) => {
   try {
-    const broadcasts = await Broadcast.find({ status: 'pending' })
-      .populate('creatorId', 'name')
-      .sort({ createdAt: -1 });
+    const broadcasts = await broadcastRepository.findByStatus('pending');
+    const withRelations = await broadcastRepository.findAllWithRelations();
+    const pendingWithRelations = withRelations.filter(b => b.status === 'pending');
     
-    res.json({ broadcasts });
+    res.json({ broadcasts: pendingWithRelations });
   } catch (error) {
     console.error('获取待审核广播错误:', error);
     res.status(500).json({ message: '服务器内部错误' });
@@ -221,25 +227,28 @@ export const getBroadcastStats = async (req: express.Request, res: express.Respo
   try {
     const { id } = req.params;
     
-    const broadcast = await Broadcast.findById(id)
-      .populate('readBy.userId', 'name');
+    const broadcast = await broadcastRepository.findById(id);
     
     if (!broadcast) {
       return res.status(404).json({ message: '广播不存在' });
     }
     
+    let readBy = [];
+    if (broadcast.readBy) {
+      try {
+        readBy = typeof broadcast.readBy === 'string' ? JSON.parse(broadcast.readBy) : broadcast.readBy;
+      } catch {
+        readBy = [];
+      }
+    }
+    
     const stats = {
-      totalRead: broadcast.readBy.length,
-      readers: broadcast.readBy
-        .filter((item): item is { userId: any; readAt: Date } => item.userId !== undefined)
-        .map(item => {
-          const userId = item.userId;
-          return {
-            userId: userId.toString(),
-            userName: userId instanceof mongoose.Types.ObjectId ? 'Unknown' : (userId as any).name || 'Unknown',
-            readAt: item.readAt
-          };
-        })
+      totalRead: readBy.length,
+      readers: readBy.map((item: any) => ({
+        userId: item.userId,
+        userName: 'Unknown',
+        readAt: item.readAt
+      }))
     };
     
     res.json({ stats });
@@ -255,13 +264,13 @@ export const updateRejectedBroadcast = async (req: express.Request, res: express
     const { id } = req.params;
     const { title, content, type, urgency, attachments } = req.body;
     
-    const broadcast = await Broadcast.findById(id);
+    const broadcast = await broadcastRepository.findById(id);
     if (!broadcast) {
       return res.status(404).json({ message: '广播不存在' });
     }
     
     // 检查是否是广播的创建者
-    if (broadcast.creatorId?.toString() !== req.user?.id?.toString()) {
+    if (broadcast.creatorId !== req.user?.id) {
       return res.status(403).json({ message: '无权限修改此广播' });
     }
     
@@ -270,34 +279,35 @@ export const updateRejectedBroadcast = async (req: express.Request, res: express
       return res.status(400).json({ message: '只能修改被驳回的广播' });
     }
     
-    // 更新广播信息
-    broadcast.title = title || broadcast.title;
-    broadcast.content = content || broadcast.content;
-    broadcast.type = type || broadcast.type;
-    broadcast.urgency = urgency || broadcast.urgency;
-    broadcast.attachments = attachments || broadcast.attachments;
-    
-    // 重置状态为待审核
-    broadcast.status = 'pending';
-    broadcast.approverId = undefined;
-    broadcast.approvalTime = undefined;
-    broadcast.rejectionReason = undefined;
-    
-    // 重新计算过期时间
+    // 计算过期时间
     let expireDays = 30;
-    if (broadcast.urgency === 'important' || broadcast.urgency === 'emergency') {
+    const newUrgency = urgency || broadcast.urgency;
+    if (newUrgency === 'important' || newUrgency === 'emergency') {
       expireDays = 90;
     }
     const expireAt = new Date();
     expireAt.setDate(expireAt.getDate() + expireDays);
-    broadcast.expireAt = expireAt;
     
-    await broadcast.save();
+    // 更新广播
+    const updated = await broadcastRepository.update(id, {
+      title: title || broadcast.title,
+      content: content || broadcast.content,
+      type: type || broadcast.type,
+      urgency: newUrgency,
+      attachments: attachments ? JSON.stringify(attachments) : broadcast.attachments,
+      status: 'pending',
+      approverId: null,
+      approvalTime: null,
+      rejectionReason: null,
+      expireAt,
+    } as any);
     
-    // 发送实时通知给管理员
-    io.emit('newBroadcastPending', broadcast);
+    if (updated) {
+      // 发送实时通知给管理员
+      io.emit('newBroadcastPending', updated);
+    }
     
-    res.json({ broadcast, success: true, message: '广播已修改并重新提交审核' });
+    res.json({ broadcast: updated, success: true, message: '广播已修改并重新提交审核' });
   } catch (error) {
     console.error('修改广播错误:', error);
     res.status(500).json({ message: '服务器内部错误' });

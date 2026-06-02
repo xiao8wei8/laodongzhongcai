@@ -10,7 +10,10 @@
     "start:prod": "DB_ENV=production npm start",
     "test": "echo \"Error: no test specified\" && exit 1",
     "backup": "node scripts/backup.js",
-    "init:admin": "ts-node scripts/initAdmin.ts"
+    "init:admin": "ts-node scripts/initAdmin.ts",
+    "db:init": "ts-node src/scripts/init-database.ts",
+    "db:migrate": "ts-node src/scripts/migrate_mongodb_to_mysql.ts",
+    "db:setup": "npm run db:init"
   },
   "keywords": [],
   "author": "",
@@ -31,13 +34,15 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.6.3",
     "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.22.4",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.1",
     "redis": "^4.6.10",
     "socket.io": "^4.7.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "tencentcloud-sdk-nodejs": "^4.1.184"
+    "tencentcloud-sdk-nodejs": "^4.1.184",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -47,6 +52,7 @@
     "@types/mongoose": "^5.11.97",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.0",
+    "@types/uuid": "^10.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   }

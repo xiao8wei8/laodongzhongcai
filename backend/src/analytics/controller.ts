@@ -1,70 +1,6 @@
 import express from 'express';
-import mongoose from 'mongoose';
-
-// 分析事件模型
-interface AnalyticsEvent {
-  event: string;
-  category: string;
-  action: string;
-  label?: string;
-  value?: number;
-  timestamp: number;
-  userId?: string;
-  sessionId: string;
-  page: string;
-  referrer: string;
-  userAgent: string;
-  screenWidth: number;
-  screenHeight: number;
-  performance?: {
-    loadTime: number;
-    domContentLoaded: number;
-    firstPaint: number;
-    firstContentfulPaint: number;
-  };
-  error?: {
-    message: string;
-    stack: string;
-    url: string;
-    line: number;
-    column: number;
-  };
-  createdAt: Date;
-}
-
-// 创建分析事件集合
-const AnalyticsEventModel = mongoose.model<AnalyticsEvent>('AnalyticsEvent', new mongoose.Schema({
-  event: String,
-  category: String,
-  action: String,
-  label: String,
-  value: Number,
-  timestamp: Number,
-  userId: String,
-  sessionId: String,
-  page: String,
-  referrer: String,
-  userAgent: String,
-  screenWidth: Number,
-  screenHeight: Number,
-  performance: {
-    loadTime: Number,
-    domContentLoaded: Number,
-    firstPaint: Number,
-    firstContentfulPaint: Number
-  },
-  error: {
-    message: String,
-    stack: String,
-    url: String,
-    line: Number,
-    column: Number
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}));
+import analyticsEventRepository from '../repositories/analyticsEventRepository';
+import { v4 as uuidv4 } from 'uuid';
 
 // 接收埋点数据
 export const trackEvents = [
@@ -77,9 +13,9 @@ export const trackEvents = [
       }
       
       // 保存事件到数据库
-      const savedEvents = await AnalyticsEventModel.insertMany(events);
+      const count = await analyticsEventRepository.trackEvents(events);
       
-      res.json({ success: true, message: 'Events tracked successfully', count: savedEvents.length });
+      res.json({ success: true, message: 'Events tracked successfully', count });
     } catch (error) {
       console.error('Track events error:', error);
       res.status(500).json({ success: false, message: 'Server error' });
@@ -93,34 +29,24 @@ export const getAnalyticsData = [
     try {
       const { startDate, endDate, event, category, page } = req.query;
       
-      const query: any = {};
+      let start: Date | undefined;
+      let end: Date | undefined;
       
       if (startDate) {
-        query.timestamp = { $gte: new Date(startDate as string).getTime() };
+        start = new Date(startDate as string);
       }
       
       if (endDate) {
-        query.timestamp = { 
-          ...query.timestamp, 
-          $lte: new Date(endDate as string).getTime() 
-        };
+        end = new Date(endDate as string);
       }
       
-      if (event) {
-        query.event = event;
-      }
-      
-      if (category) {
-        query.category = category;
-      }
-      
-      if (page) {
-        query.page = page;
-      }
-      
-      const events = await AnalyticsEventModel.find(query)
-        .sort({ timestamp: -1 })
-        .limit(1000);
+      const events = await analyticsEventRepository.findByDateRange(
+        start,
+        end,
+        event as string,
+        category as string,
+        page as string
+      );
       
       // 统计数据
       const performanceEvents = events.filter(e => e.performance?.loadTime);
@@ -146,15 +72,7 @@ export const getAnalyticsData = [
 export const getPageStats = [
   async (req: express.Request, res: express.Response) => {
     try {
-      const pageStats = await AnalyticsEventModel.aggregate([
-        { $match: { event: 'page_view' } },
-        { $group: { 
-          _id: '$page', 
-          count: { $sum: 1 },
-          averageLoadTime: { $avg: '$performance.loadTime' }
-        } },
-        { $sort: { count: -1 } }
-      ]);
+      const pageStats = await analyticsEventRepository.getPageStats();
       
       res.json({ success: true, data: pageStats });
     } catch (error) {
@@ -168,15 +86,7 @@ export const getPageStats = [
 export const getErrorStats = [
   async (req: express.Request, res: express.Response) => {
     try {
-      const errorStats = await AnalyticsEventModel.aggregate([
-        { $match: { event: 'error' } },
-        { $group: { 
-          _id: '$error.message', 
-          count: { $sum: 1 },
-          lastOccurred: { $max: '$timestamp' }
-        } },
-        { $sort: { count: -1 } }
-      ]);
+      const errorStats = await analyticsEventRepository.getErrorStats();
       
       res.json({ success: true, data: errorStats });
     } catch (error) {

@@ -109,7 +109,7 @@ const Login: React.FC = () => {
         
         {/* 测试账号信息 */}
         <div style={{ marginTop: 32 }}>
-          <h3 style={{ marginBottom: 16, textAlign: 'center', fontSize: 16, color: '#666' }}>测试账号</h3>
+          <h3 style={{ marginBottom: 16, textAlign: 'center', fontSize: 16, color: '#666' }}>账号提示</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <div style={{ padding: 16, border: '1px solid #e8e8e8', borderRadius: 4, backgroundColor: '#fafafa' }}>
               <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#1890ff' }}>调解员</div>
@@ -131,6 +131,9 @@ const Login: React.FC = () => {
               <div style={{ marginBottom: 4 }}>用户名: company</div>
               <div>密码: 123456</div>
             </div>
+          </div>
+          <div style={{ marginTop: 12, fontSize: 12, color: '#999', textAlign: 'center' }}>
+            登录时请确保“角色”与账号类型匹配（例如 admin 需选择“管理员”，mediator 需选择“调解员”）。
           </div>
         </div>
       </Card>

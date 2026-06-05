@@ -11,11 +11,16 @@ interface ServiceStatus {
   timestamp: string;
   dbEnv?: string;
   mongoUri?: string;
+  mysqlHost?: string;
+  mysqlPort?: string;
+  mysqlDatabase?: string;
 }
 
 interface ServicesStatus {
   backend: ServiceStatus;
-  mongodb: ServiceStatus;
+  // 兼容：早期版本使用 mongodb 字段；当前后端使用 mysql 字段
+  mongodb?: ServiceStatus;
+  mysql?: ServiceStatus;
   frontend: ServiceStatus;
   sms: ServiceStatus;
   email: ServiceStatus;
@@ -33,6 +38,9 @@ const ServiceManagement: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.get('/services/status');
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message || '获取服务状态失败');
+      }
       setServiceStatus(response.data.services);
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || '获取服务状态失败';
@@ -164,6 +172,51 @@ const ServiceManagement: React.FC = () => {
 
       {serviceStatus ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+          {/*
+            兼容：数据库状态
+            - 如果有 mongodb 字段，按 MongoDB 展示
+            - 否则如果有 mysql 字段，按 MySQL 展示
+          */}
+          {(() => {
+            const dbService = serviceStatus.mongodb || serviceStatus.mysql;
+            const dbLabel = serviceStatus.mongodb ? 'MongoDB' : 'MySQL';
+            if (!dbService) return null;
+            return (
+              <Card
+                title={
+                  <Space>
+                    <Text strong>{dbLabel}</Text>
+                    {getStatusIcon(dbService.status)}
+                  </Space>
+                }
+                bordered={true}
+                style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
+              >
+                <Descriptions column={1}>
+                  <Descriptions.Item label="状态">
+                    <Text style={{ color: getStatusColor(dbService.status) }}>
+                      {getStatusText(dbService.status)}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="消息">
+                    <Text>{dbService.message}</Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="更新时间">
+                    <Text>{new Date(dbService.timestamp).toLocaleString()}</Text>
+                  </Descriptions.Item>
+                </Descriptions>
+                <div style={{ marginTop: 16 }}>
+                  <Alert
+                    message={`${dbLabel} 服务管理`}
+                    description={`${dbLabel} 服务需要通过系统服务管理工具或命令行进行管理`}
+                    type="info"
+                    showIcon
+                  />
+                </div>
+              </Card>
+            );
+          })()}
+
           {/* 数据库环境状态卡片 */}
           <Card
             title={
@@ -187,7 +240,19 @@ const ServiceManagement: React.FC = () => {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="MongoDB地址">
-                <Text style={{ wordBreak: 'break-all' }}>{serviceStatus.environment.mongoUri}</Text>
+                <Text style={{ wordBreak: 'break-all' }}>
+                  {serviceStatus.environment.mongoUri || '—'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="MySQL地址">
+                <Text style={{ wordBreak: 'break-all' }}>
+                  {serviceStatus.environment.mysqlHost
+                    ? `${serviceStatus.environment.mysqlHost}:${serviceStatus.environment.mysqlPort || ''}`
+                    : '—'}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="MySQL库名">
+                <Text>{serviceStatus.environment.mysqlDatabase || '—'}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="更新时间">
                 <Text>{new Date(serviceStatus.environment.timestamp).toLocaleString()}</Text>
@@ -196,7 +261,7 @@ const ServiceManagement: React.FC = () => {
             <div style={{ marginTop: 16 }}>
               <Alert
                 message="环境说明"
-                description="开发环境使用本地 MongoDB，生产环境使用远程 MongoDB 服务器"
+                description="当前服务以数据库连接配置为准（可能为 MySQL 或 MongoDB）。"
                 type="info"
                 showIcon
               />
@@ -256,39 +321,7 @@ const ServiceManagement: React.FC = () => {
             </div>
           </Card>
 
-          {/* MongoDB 状态卡片 */}
-          <Card
-            title={
-              <Space>
-                <Text strong>MongoDB</Text>
-                {getStatusIcon(serviceStatus.mongodb.status)}
-              </Space>
-            }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
-          >
-            <Descriptions column={1}>
-              <Descriptions.Item label="状态">
-                <Text style={{ color: getStatusColor(serviceStatus.mongodb.status) }}>
-                  {getStatusText(serviceStatus.mongodb.status)}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="消息">
-                <Text>{serviceStatus.mongodb.message}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="更新时间">
-                <Text>{new Date(serviceStatus.mongodb.timestamp).toLocaleString()}</Text>
-              </Descriptions.Item>
-            </Descriptions>
-            <div style={{ marginTop: 16 }}>
-              <Alert
-                message="MongoDB 服务管理"
-                description="MongoDB 服务需要通过系统服务管理工具或命令行进行管理"
-                type="info"
-                showIcon
-              />
-            </div>
-          </Card>
+          {/* 数据库状态卡片（已在上方统一渲染） */}
 
           {/* 前端服务状态卡片 */}
           <Card

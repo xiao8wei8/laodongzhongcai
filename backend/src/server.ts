@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
 import http from 'http';
+import path from 'path';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import pool from './config/mysql';
@@ -39,14 +40,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// 前端静态资源（使用已构建的 frontend/dist，挂载到与前端 basename 一致的路径）
+// 这样无需启动 Vite dev server 也能访问前端页面
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+app.use('/laodongzhongcai', express.static(frontendDistPath));
+
 // 健康检查
 app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+app.get('/laodongzhongcai/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
 // Swagger API文档
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/api/docs.json', (req, res) => {
+  res.json(swaggerSpec);
+});
+app.use('/laodongzhongcai/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/laodongzhongcai/api/docs.json', (req, res) => {
   res.json(swaggerSpec);
 });
 
@@ -60,22 +73,40 @@ app.get('/api/test/db', async (req, res) => {
     res.status(500).json({ status: 'error', message: '数据库连接失败' });
   }
 });
+app.get('/laodongzhongcai/api/test/db', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 as test');
+    res.json({ status: 'ok', mysql: 'connected', data: rows });
+  } catch (error) {
+    console.error('数据库测试失败:', error);
+    res.status(500).json({ status: 'error', message: '数据库连接失败' });
+  }
+});
 
 // 路由配置
-app.use('/api/auth', authRoutes);
-app.use('/api/case', caseRoutes);
-app.use('/api/visitor', visitorRoutes);
-app.use('/api/application', applicationRoutes);
-app.use('/api/broadcast', broadcastRoutes);
-app.use('/api/evidence', evidenceRoutes);
-app.use('/api/notification', notificationRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/system/settings', systemSettingsRoutes);
-app.use('/api/message', messageRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/backup', backupRoutes);
+const API_BASE_PATHS = ['/api', '/laodongzhongcai/api'];
+for (const base of API_BASE_PATHS) {
+  app.use(`${base}/auth`, authRoutes);
+  app.use(`${base}/case`, caseRoutes);
+  app.use(`${base}/visitor`, visitorRoutes);
+  app.use(`${base}/application`, applicationRoutes);
+  app.use(`${base}/broadcast`, broadcastRoutes);
+  app.use(`${base}/evidence`, evidenceRoutes);
+  app.use(`${base}/notification`, notificationRoutes);
+  app.use(`${base}/user`, userRoutes);
+  app.use(`${base}/dashboard`, dashboardRoutes);
+  app.use(`${base}/services`, serviceRoutes);
+  app.use(`${base}/system/settings`, systemSettingsRoutes);
+  app.use(`${base}/message`, messageRoutes);
+  app.use(`${base}/analytics`, analyticsRoutes);
+  app.use(`${base}/backup`, backupRoutes);
+}
+
+// SPA 路由回退（必须放在 API 路由之后；并且排除 /laodongzhongcai/api/*）
+app.get('/laodongzhongcai/*', (req, res, next) => {
+  if (req.path.startsWith('/laodongzhongcai/api')) return next();
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
+});
 
 // 404处理
 app.use('*', (req, res) => {
@@ -95,8 +126,8 @@ const initDatabase = async () => {
     await pool.query('SELECT 1');
     console.log('MySQL连接成功');
   } catch (error) {
-    console.error('MySQL连接失败:', error);
-    process.exit(1);
+    // 开发/演示场景下允许继续启动，避免因为数据库不可达导致整个服务无法运行
+    console.error('MySQL连接失败（将继续启动服务，部分接口可能不可用）:', error);
   }
 };
 
@@ -107,7 +138,9 @@ initDatabase();
 const server = http.createServer(app);
 
 // 配置Socket.io
+// 注意：前端在生产环境使用子目录部署（/laodongzhongcai），socket.io path 也需要一致
 const io = new Server(server, {
+  path: '/laodongzhongcai/socket.io',
   cors: {
     origin: '*',
     methods: ['GET', 'POST']

@@ -30,16 +30,20 @@ export const checkServiceStatus = [
       let frontendStatus = 'running';
       let frontendMessage = '前端服务运行正常';
       try {
-        // 尝试连接前端服务
-        const frontendResponse = await axios.get('http://localhost:5175');
+        // 尝试连接前端页面
+        // 当前项目在生产形态下是由后端托管 frontend/dist（子路径 /laodongzhongcai），
+        // 因此这里使用后端同端口探测，而不是固定 5175（避免误报“未连接”）。
+        const frontendResponse = await axios.get('http://localhost:5003/laodongzhongcai/', {
+          timeout: 3000
+        });
         if (frontendResponse.status === 200) {
           frontendStatus = 'running';
-          frontendMessage = '前端服务运行正常';
+          frontendMessage = '前端页面可访问（由后端托管 dist）';
         }
       } catch (error) {
         console.error('检查前端服务状态失败:', error);
         frontendStatus = 'disconnected';
-        frontendMessage = '前端服务连接失败';
+        frontendMessage = '前端页面访问失败';
       }
 
 

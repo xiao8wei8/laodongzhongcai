@@ -46,7 +46,9 @@ async function initDatabase() {
     console.log(`✅ 数据库 ${dbConfig.database} 准备就绪！\n`);
 
     // 3. 选择数据库
-    await connection.execute(`USE \`${dbConfig.database}\``);
+    // 注意：部分 MySQL 兼容实现（或特定配置）不支持在 prepared statement 协议下执行 USE，
+    // 因此这里使用 query 而非 execute。
+    await connection.query(`USE \`${dbConfig.database}\``);
 
     // 4. 执行表结构创建脚本
     console.log('📋  创建表结构...');

@@ -40,7 +40,11 @@ const router = express.Router();
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/', [auth, roleAuth(['admin'])], getSystemSettings);
+// 说明：
+// - 全局布局（Header）需要读取系统名称/图标，因此 GET 允许所有已登录用户访问；
+// - 但敏感字段（如 apiKeys）会在 controller 中对非管理员做脱敏/裁剪；
+// - PUT 仍仅管理员可用。
+router.get('/', [auth], getSystemSettings);
 
 /**
  * @swagger

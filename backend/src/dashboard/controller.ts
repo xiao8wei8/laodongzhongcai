@@ -60,12 +60,19 @@ const getStatsData = async (userId: string | undefined, role: string | undefined
     visitorStats = await visitorRecordRepository.getStatistics(userId);
   }
   
+  // MySQL 驱动在某些情况下会把 COUNT/聚合字段返回为字符串（例如 "1"），
+  // 直接用 + 会发生字符串拼接（例如 "1" + "0" => "10"），导致统计数异常。
+  const toNum = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   // 合并统计
-  const total = (caseStats.total || 0) + (visitorStats.total || 0);
-  const pendingCases = (caseStats.pending || 0) + (visitorStats.pending || 0);
-  const processingCases = (caseStats.processing || 0) + (visitorStats.processing || 0);
-  const completedCases = (caseStats.completed || 0) + (visitorStats.completed || 0);
-  const failedCases = (caseStats.failed || 0) + (visitorStats.failed || 0);
+  const total = toNum(caseStats.total) + toNum(visitorStats.total);
+  const pendingCases = toNum(caseStats.pending) + toNum(visitorStats.pending);
+  const processingCases = toNum(caseStats.processing) + toNum(visitorStats.processing);
+  const completedCases = toNum(caseStats.completed) + toNum(visitorStats.completed);
+  const failedCases = toNum(caseStats.failed) + toNum(visitorStats.failed);
 
   // 获取今日访客记录数（仅管理员和调解员可见）
   let todayVisitors = 0;

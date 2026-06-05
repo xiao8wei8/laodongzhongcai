@@ -49,7 +49,8 @@ const Layout: React.FC = () => {
     try {
       const response = await api.get('/system/settings');
       setSystemSettings({
-        systemName: response.data.basic?.systemName || '劳动仲裁调解系统',
+        // 兼容：后端可能返回 basic.systemName 或旧字段 basic.siteName
+        systemName: response.data.basic?.systemName || response.data.basic?.siteName || '劳动仲裁调解系统',
         systemIcon: response.data.basic?.systemIcon || 'BankOutlined'
       });
     } catch (error) {

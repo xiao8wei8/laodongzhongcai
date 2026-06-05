@@ -8,9 +8,17 @@ export const getSystemSettings = async (req: express.Request, res: express.Respo
     // 获取所有设置，然后组装成原始格式
     const settings = await systemSettingsRepository.getAllSettings();
     
+    const systemIcon = settings['basic.systemIcon'] || 'BankOutlined';
+    const isAdmin = req.user?.role === 'admin';
+
     // 构建默认设置对象
     const defaultSettings: any = {
       basic: {
+        // 兼容字段：Layout / SystemSettings 页面使用 systemName/systemIcon
+        systemName: settings['basic.siteName'] || '劳动争议调解平台',
+        systemIcon,
+
+        // 旧字段（保留兼容）
         siteName: settings['basic.siteName'] || '劳动争议调解平台',
         siteDescription: settings['basic.siteDescription'] || '专业的劳动争议调解服务平台',
         workStartTime: settings['basic.workStartTime'] || '09:00',
@@ -36,6 +44,16 @@ export const getSystemSettings = async (req: express.Request, res: express.Respo
       }
     };
     
+    // 非管理员只返回“公开设置”，避免把敏感 apiKeys 泄露给普通用户
+    if (!isAdmin) {
+      return res.json({
+        basic: {
+          systemName: defaultSettings.basic.systemName,
+          systemIcon: defaultSettings.basic.systemIcon
+        }
+      });
+    }
+
     res.json(defaultSettings);
   } catch (error) {
     console.error('获取系统设置错误:', error);
@@ -50,6 +68,10 @@ export const updateSystemSettings = async (req: express.Request, res: express.Re
     
     // 更新基本设置
     if (basic) {
+      // 兼容前端字段：systemName/systemIcon
+      if (basic.systemName !== undefined) await systemSettingsRepository.setValue('basic.siteName', basic.systemName);
+      if (basic.systemIcon !== undefined) await systemSettingsRepository.setValue('basic.systemIcon', basic.systemIcon);
+
       if (basic.siteName !== undefined) await systemSettingsRepository.setValue('basic.siteName', basic.siteName);
       if (basic.siteDescription !== undefined) await systemSettingsRepository.setValue('basic.siteDescription', basic.siteDescription);
       if (basic.workStartTime !== undefined) await systemSettingsRepository.setValue('basic.workStartTime', basic.workStartTime);

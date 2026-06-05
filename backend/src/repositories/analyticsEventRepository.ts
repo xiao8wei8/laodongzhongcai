@@ -1,5 +1,6 @@
 import BaseRepository from './baseRepository';
 import pool from '../config/mysql';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AnalyticsEvent {
   id: string;
@@ -166,7 +167,8 @@ class AnalyticsEventRepository extends BaseRepository<AnalyticsEvent> {
 
   async trackEvent(eventType: string, eventData: any, userId?: string): Promise<AnalyticsEvent> {
     return await this.create({
-      id: (eventData as any)?.id || undefined,
+      // analytics_events.id 是主键且不可为空；如果前端未传 id，这里生成一个 UUID
+      id: (eventData as any)?.id || uuidv4(),
       eventType,
       eventData: typeof eventData === 'string' ? eventData : JSON.stringify(eventData),
       userId,

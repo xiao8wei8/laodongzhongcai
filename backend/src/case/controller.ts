@@ -112,9 +112,13 @@ export const getCases = async (req: express.Request, res: express.Response) => {
     console.log('到访登记记录状态:', visitorRecords.map(r => ({ id: r.id, status: r.status })));
     
     // 合并两种记录，确保不重复
-    const allCases = [...formattedVisitorCases, ...cases];
+    const allCases = [...formattedVisitorCases, ...cases].map((item: any) => ({
+      ...item,
+      // 前端普遍使用 _id 作为主键；这里做一次统一兼容
+      _id: item._id || item.id
+    }));
   
-  res.json({ cases: allCases });
+    res.json({ cases: allCases });
   } catch (error) {
     console.error('获取案件列表错误:', error);
     res.status(500).json({ message: '服务器内部错误' });
@@ -174,6 +178,11 @@ export const getCaseById = async (req: express.Request, res: express.Response) =
     if (!isVisitorRecord) {
       const relations = await caseRepository.findWithRelations(caseData.id);
       caseWithRelations = relations || caseData;
+    }
+
+    // 统一 _id 字段，避免前端路由出现 /case/undefined
+    if (caseWithRelations && !caseWithRelations._id) {
+      caseWithRelations._id = caseData.id;
     }
     
     // 检查权限

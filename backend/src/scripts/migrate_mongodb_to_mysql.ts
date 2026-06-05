@@ -1,11 +1,42 @@
 import mongoose from 'mongoose';
 import pool from '../config/mysql';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
 // MongoDB 连接配置
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/laodong';
+
+// 迁移过程中用于保证外键引用完整性的缓存
+const migratedUserIds = new Set<string>();
+const migratedCaseIds = new Set<string>();
+const PLACEHOLDER_PASSWORD_HASH = bcrypt.hashSync('123456', 10);
+let defaultCreatorUserId: string | null = null;
+
+// 确保用户存在（用于修复历史 MongoDB 数据中存在“案件引用了不存在的用户”的情况）
+async function ensureUserExists(connection: any, userId?: string | null) {
+  if (!userId) return;
+  if (migratedUserIds.has(userId)) return;
+
+  const username = `imported_${userId}`;
+  const name = `迁移缺失用户_${userId.slice(-6)}`;
+  const now = new Date();
+
+  try {
+    await connection.query(
+      `INSERT INTO users (
+        id, username, password, name, role, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [userId, username, PLACEHOLDER_PASSWORD_HASH, name, 'personal', now, now]
+    );
+  } catch (e: any) {
+    // 如果已存在（可能是重复执行/并发），忽略插入错误即可
+    if (e?.code !== 'ER_DUP_ENTRY') throw e;
+  }
+
+  migratedUserIds.add(userId);
+}
 
 // 定义 MongoDB 模型（简化版本）
 const UserSchema = new mongoose.Schema({
@@ -249,6 +280,17 @@ async function migrateUsers(connection: any) {
         user.updatedAt || new Date()
       ]
     );
+    migratedUserIds.add(user._id.toString());
+
+    // 记录一个默认的 creatorId 兜底值（优先管理员，否则使用第一条用户）
+    if (!defaultCreatorUserId) {
+      defaultCreatorUserId = user._id.toString();
+    } else if (!defaultCreatorUserId && user.role === 'admin') {
+      defaultCreatorUserId = user._id.toString();
+    }
+    if (user.role === 'admin') {
+      defaultCreatorUserId = user._id.toString();
+    }
   }
   console.log(`✅ 用户数据迁移完成: ${users.length} 条`);
 }
@@ -259,6 +301,11 @@ async function migrateCases(connection: any) {
   const cases = await CaseModel.find().lean();
   
   for (const caseData of cases) {
+    // 修复：历史数据可能存在案件引用了不存在的用户，先补齐占位用户以通过外键约束
+    await ensureUserExists(connection, caseData.applicantId?.toString());
+    await ensureUserExists(connection, caseData.respondentId?.toString());
+    await ensureUserExists(connection, caseData.mediatorId?.toString() || null);
+
     await connection.query(
       `INSERT INTO cases (
         id, caseNumber, applicantId, respondentId, disputeType, caseAmount, 
@@ -280,6 +327,7 @@ async function migrateCases(connection: any) {
         caseData.updatedAt || new Date()
       ]
     );
+    migratedCaseIds.add(caseData._id.toString());
   }
   console.log(`✅ 案件数据迁移完成: ${cases.length} 条`);
 }
@@ -290,6 +338,8 @@ async function migrateVisitorRecords(connection: any) {
   const records = await VisitorRecordModel.find().lean();
   
   for (const record of records) {
+    await ensureUserExists(connection, record.mediatorId?.toString() || null);
+
     await connection.query(
       `INSERT INTO visitor_records (
         id, registerNumber, visitorName, phone, visitType, disputeType, reason, 
@@ -322,13 +372,21 @@ async function migrateCaseProgress(connection: any) {
   const CaseProgressModel = mongoose.model('CaseProgress', CaseProgressSchema);
   const progresses = await CaseProgressModel.find().lean();
   
+  let skipped = 0;
   for (const progress of progresses) {
+    const caseId = progress.caseId?.toString();
+    if (!caseId || !migratedCaseIds.has(caseId)) {
+      skipped++;
+      continue;
+    }
+    await ensureUserExists(connection, progress.creatorId?.toString() || null);
+
     await connection.query(
       `INSERT INTO case_progress (id, caseId, content, type, creatorId, createdAt) 
       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         progress._id.toString(),
-        progress.caseId?.toString(),
+        caseId,
         progress.content,
         progress.type,
         progress.creatorId?.toString(),
@@ -336,7 +394,7 @@ async function migrateCaseProgress(connection: any) {
       ]
     );
   }
-  console.log(`✅ 案件进度数据迁移完成: ${progresses.length} 条`);
+  console.log(`✅ 案件进度数据迁移完成: ${progresses.length - skipped} 条（跳过孤儿记录: ${skipped} 条）`);
 }
 
 async function migrateEvidences(connection: any) {
@@ -344,13 +402,21 @@ async function migrateEvidences(connection: any) {
   const EvidenceModel = mongoose.model('Evidence', EvidenceSchema);
   const evidences = await EvidenceModel.find().lean();
   
+  let skipped = 0;
   for (const evidence of evidences) {
+    const caseId = evidence.caseId?.toString();
+    if (!caseId || !migratedCaseIds.has(caseId)) {
+      skipped++;
+      continue;
+    }
+    await ensureUserExists(connection, evidence.uploaderId?.toString() || null);
+
     await connection.query(
       `INSERT INTO evidences (id, caseId, name, type, path, uploaderId, createdAt) 
       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         evidence._id.toString(),
-        evidence.caseId?.toString(),
+        caseId,
         evidence.name,
         evidence.type,
         evidence.path,
@@ -359,7 +425,7 @@ async function migrateEvidences(connection: any) {
       ]
     );
   }
-  console.log(`✅ 证据数据迁移完成: ${evidences.length} 条`);
+  console.log(`✅ 证据数据迁移完成: ${evidences.length - skipped} 条（跳过孤儿记录: ${skipped} 条）`);
 }
 
 async function migrateBroadcasts(connection: any) {
@@ -368,6 +434,8 @@ async function migrateBroadcasts(connection: any) {
   const broadcasts = await BroadcastModel.find().lean();
   
   for (const broadcast of broadcasts) {
+    await ensureUserExists(connection, broadcast.creatorId?.toString() || null);
+
     await connection.query(
       `INSERT INTO broadcasts (id, title, content, type, urgency, creatorId, expireAt, createdAt) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -391,22 +459,39 @@ async function migrateMessages(connection: any) {
   const MessageModel = mongoose.model('Message', MessageSchema);
   const messages = await MessageModel.find().lean();
   
+  let skipped = 0;
   for (const message of messages) {
+    const msg: any = message as any;
+    const senderId = msg.senderId?.toString();
+    const receiverId = msg.receiverId?.toString();
+    // MySQL messages.senderId / receiverId 不允许为 NULL；历史数据中若存在系统测试消息等缺字段记录，直接跳过
+    if (!senderId || !receiverId) {
+      skipped++;
+      continue;
+    }
+
+    await ensureUserExists(connection, senderId);
+    await ensureUserExists(connection, receiverId);
+    const caseId = msg.caseId?.toString();
+    const safeCaseId = caseId && migratedCaseIds.has(caseId) ? caseId : null;
+
     await connection.query(
-      `INSERT INTO messages (id, senderId, receiverId, content, isRead, readAt, createdAt) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (id, senderId, receiverId, content, type, caseId, isRead, readAt, createdAt) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        message._id.toString(),
-        message.senderId?.toString(),
-        message.receiverId?.toString(),
-        message.content,
-        message.isRead || false,
-        message.readAt || null,
-        message.createdAt || new Date()
+        msg._id.toString(),
+        senderId,
+        receiverId,
+        msg.content,
+        msg.type || null,
+        safeCaseId,
+        msg.isRead || false,
+        msg.readAt || null,
+        msg.createdAt || new Date()
       ]
     );
   }
-  console.log(`✅ 消息数据迁移完成: ${messages.length} 条`);
+  console.log(`✅ 消息数据迁移完成: ${messages.length - skipped} 条（跳过无接收方/发送方记录: ${skipped} 条）`);
 }
 
 async function migrateNotifications(connection: any) {
@@ -415,6 +500,8 @@ async function migrateNotifications(connection: any) {
   const notifications = await NotificationModel.find().lean();
   
   for (const notification of notifications) {
+    await ensureUserExists(connection, notification.userId?.toString() || null);
+
     await connection.query(
       `INSERT INTO notifications (id, userId, title, content, type, isRead, readAt, createdAt) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -438,24 +525,34 @@ async function migrateSchedules(connection: any) {
   const ScheduleModel = mongoose.model('Schedule', ScheduleSchema);
   const schedules = await ScheduleModel.find().lean();
   
+  let skipped = 0;
   for (const schedule of schedules) {
+    const creatorId = schedule.creatorId?.toString() || defaultCreatorUserId;
+    if (!creatorId) {
+      skipped++;
+      continue;
+    }
+    await ensureUserExists(connection, creatorId);
+    const caseId = schedule.caseId?.toString();
+    const safeCaseId = caseId && migratedCaseIds.has(caseId) ? caseId : null;
+
     await connection.query(
       `INSERT INTO schedules (id, caseId, title, description, category, date, creatorId, createdAt, updatedAt) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         schedule._id.toString(),
-        schedule.caseId?.toString() || null,
+        safeCaseId,
         schedule.title,
         schedule.description || null,
         schedule.category || null,
         schedule.date,
-        schedule.creatorId?.toString(),
+        creatorId,
         schedule.createdAt || new Date(),
         schedule.updatedAt || new Date()
       ]
     );
   }
-  console.log(`✅ 日程数据迁移完成: ${schedules.length} 条`);
+  console.log(`✅ 日程数据迁移完成: ${schedules.length - skipped} 条（跳过无创建人记录: ${skipped} 条）`);
 }
 
 async function migrateReminderSettings(connection: any) {
@@ -463,14 +560,27 @@ async function migrateReminderSettings(connection: any) {
   const ReminderSettingModel = mongoose.model('ReminderSetting', ReminderSettingSchema);
   const settings = await ReminderSettingModel.find().lean();
   
+  let skipped = 0;
   for (const setting of settings) {
+    const userId = setting.userId?.toString();
+    const type = setting.type;
+    if (!userId || !type) {
+      skipped++;
+      continue;
+    }
+    await ensureUserExists(connection, userId);
+
     await connection.query(
       `INSERT INTO reminder_settings (id, userId, type, enabled, advanceTime, createdAt, updatedAt) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE 
+        enabled = VALUES(enabled),
+        advanceTime = VALUES(advanceTime),
+        updatedAt = VALUES(updatedAt)`,
       [
         setting._id.toString(),
-        setting.userId?.toString(),
-        setting.type,
+        userId,
+        type,
         setting.enabled !== false,
         setting.advanceTime || 30,
         setting.createdAt || new Date(),
@@ -478,7 +588,7 @@ async function migrateReminderSettings(connection: any) {
       ]
     );
   }
-  console.log(`✅ 提醒设置数据迁移完成: ${settings.length} 条`);
+  console.log(`✅ 提醒设置数据迁移完成: ${settings.length - skipped} 条（跳过无类型/无用户记录: ${skipped} 条）`);
 }
 
 async function migrateSystemSettings(connection: any) {
@@ -486,10 +596,19 @@ async function migrateSystemSettings(connection: any) {
   const SystemSettingsModel = mongoose.model('SystemSettings', SystemSettingsSchema);
   const settings = await SystemSettingsModel.find().lean();
   
+  let skipped = 0;
   for (const setting of settings) {
+    if (!setting.settingKey) {
+      skipped++;
+      continue;
+    }
     await connection.query(
       `INSERT INTO system_settings (id, settingKey, settingValue, description, createdAt, updatedAt) 
-      VALUES (?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        settingValue = VALUES(settingValue),
+        description = VALUES(description),
+        updatedAt = VALUES(updatedAt)`,
       [
         setting._id.toString(),
         setting.settingKey,
@@ -500,7 +619,7 @@ async function migrateSystemSettings(connection: any) {
       ]
     );
   }
-  console.log(`✅ 系统设置数据迁移完成: ${settings.length} 条`);
+  console.log(`✅ 系统设置数据迁移完成: ${settings.length - skipped} 条（跳过无 settingKey 记录: ${skipped} 条）`);
 }
 
 async function migrateAnalyticsEvents(connection: any) {
@@ -508,20 +627,41 @@ async function migrateAnalyticsEvents(connection: any) {
   const AnalyticsEventModel = mongoose.model('AnalyticsEvent', AnalyticsEventSchema);
   const events = await AnalyticsEventModel.find().lean();
   
+  let skipped = 0;
   for (const event of events) {
+    const ev: any = event as any;
+    // 兼容旧 MongoDB 结构：很多埋点记录使用 event/category/action... 而不是 eventType/eventData
+    const eventType: string | undefined = ev.eventType || ev.event;
+    if (!eventType) {
+      skipped++;
+      continue;
+    }
+
+    // eventData：优先使用 ev.eventData，否则把埋点扁平字段打包成 JSON
+    const packedEventData = (() => {
+      if (ev.eventData) return ev.eventData;
+      const { _id, __v, eventType: _et, ...rest } = ev;
+      return rest;
+    })();
+
     await connection.query(
       `INSERT INTO analytics_events (id, eventType, eventData, userId, createdAt) 
-      VALUES (?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        eventType = VALUES(eventType),
+        eventData = VALUES(eventData),
+        userId = VALUES(userId),
+        createdAt = VALUES(createdAt)`,
       [
-        event._id.toString(),
-        event.eventType,
-        event.eventData ? JSON.stringify(event.eventData) : null,
-        event.userId?.toString() || null,
-        event.createdAt || new Date()
+        ev._id.toString(),
+        eventType,
+        packedEventData ? JSON.stringify(packedEventData) : null,
+        ev.userId?.toString?.() || null,
+        ev.createdAt || new Date()
       ]
     );
   }
-  console.log(`✅ 分析事件数据迁移完成: ${events.length} 条`);
+  console.log(`✅ 分析事件数据迁移完成: ${events.length - skipped} 条（跳过无事件类型记录: ${skipped} 条）`);
 }
 
 async function migrateAiUsages(connection: any) {
@@ -530,13 +670,18 @@ async function migrateAiUsages(connection: any) {
   const usages = await AiUsageModel.find().lean();
   
   for (const usage of usages) {
+    const caseId = usage.caseId?.toString();
+    const safeCaseId = caseId && migratedCaseIds.has(caseId) ? caseId : null;
+    const userId = usage.userId?.toString();
+    if (userId) await ensureUserExists(connection, userId);
+
     await connection.query(
       `INSERT INTO ai_usages (id, userId, caseId, serviceType, requestData, responseData, tokensUsed, cost, createdAt) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         usage._id.toString(),
-        usage.userId?.toString() || null,
-        usage.caseId?.toString() || null,
+        userId || null,
+        safeCaseId,
         usage.serviceType,
         usage.requestData ? JSON.stringify(usage.requestData) : null,
         usage.responseData ? JSON.stringify(usage.responseData) : null,

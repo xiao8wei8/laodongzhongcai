@@ -59,6 +59,18 @@ async function initDatabase() {
     await connection.query(createTablesSql);
     console.log('✅ 所有表创建成功！\n');
 
+    // 4.5. 补全微信 openid 字段（兼容旧数据库）
+    console.log('🔧  检查并补全微信登录字段...');
+    try {
+      await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS wechat_mp_openid VARCHAR(255) DEFAULT NULL');
+      await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS wechat_web_openid VARCHAR(255) DEFAULT NULL');
+      await connection.query('CREATE INDEX IF NOT EXISTS idx_users_wechat_mp_openid ON users (wechat_mp_openid)');
+      await connection.query('CREATE INDEX IF NOT EXISTS idx_users_wechat_web_openid ON users (wechat_web_openid)');
+      console.log('✅ 微信 openid 字段准备就绪！\n');
+    } catch (e) {
+      console.log('ℹ️  微信字段检查/补全提示（可能已存在）：', (e as any).message, '\n');
+    }
+
     // 5. 检查是否已有初始数据
     const [existingUsers] = await connection.execute('SELECT COUNT(*) as count FROM users');
     const userCount = (existingUsers as any)[0].count;

@@ -1,0 +1,125 @@
+.register-container {
+  min-height: 100vh;
+  padding: 30rpx 40rpx 60rpx;
+  box-sizing: border-box;
+}
+
+.register-header {
+  text-align: center;
+  padding: 40rpx 0 40rpx;
+}
+
+.register-title {
+  font-size: 44rpx;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 14rpx;
+  color: #1a1a1a;
+  letter-spacing: 2rpx;
+}
+
+.register-subtitle {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+/* 卡片：更大内边距 + 圆角 + 阴影 */
+.card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 50rpx 40rpx;
+  box-shadow: 0 8rpx 30rpx rgba(24, 144, 255, 0.08);
+  margin-bottom: 20rpx;
+}
+
+/* 表单字段间距加大 */
+.form-item {
+  margin-bottom: 40rpx;
+}
+
+.form-label {
+  display: block;
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 16rpx;
+  font-weight: 500;
+}
+
+.form-label-required::before {
+  content: '*';
+  color: #ff4d4f;
+  margin-right: 8rpx;
+}
+
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 96rpx;
+  padding: 0 28rpx;
+  background: #f5f7fa;
+  border: 2rpx solid transparent;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.form-input:focus {
+  background: #ffffff;
+  border-color: #1890ff;
+}
+
+/* 角色选择卡片 */
+.role-tabs {
+  display: flex;
+  gap: 20rpx;
+}
+
+.role-tab {
+  flex: 1;
+  padding: 32rpx 20rpx;
+  background: #f5f7fa;
+  border-radius: 16rpx;
+  text-align: center;
+  font-size: 30rpx;
+  border: 2rpx solid transparent;
+}
+
+.role-tab.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+  font-weight: bold;
+}
+
+/* 注册按钮 */
+.btn-primary {
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%) !important;
+  color: #fff !important;
+  font-size: 34rpx;
+  font-weight: 500;
+  border-radius: 50rpx;
+  padding: 28rpx 0;
+  margin-top: 20rpx;
+  border: none;
+  box-shadow: 0 6rpx 16rpx rgba(24, 144, 255, 0.25);
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-primary {
+  color: #1890ff;
+}
+
+.text-sm {
+  font-size: 28rpx;
+}
+
+.mt-20 {
+  margin-top: 20rpx;
+}

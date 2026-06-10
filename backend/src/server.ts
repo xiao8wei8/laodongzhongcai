@@ -84,7 +84,12 @@ app.get('/laodongzhongcai/api/test/db', async (req, res) => {
 });
 
 // 路由配置
-const API_BASE_PATHS = ['/api', '/laodongzhongcai/api'];
+// 说明：Nginx 会把 /laodongzhongcai/api/* 重写为 /* 后转发到本服务
+// 所以同时提供 3 组前缀，保证无论哪种路径都能命中：
+//   - 无前缀（Nginx rewrite 后：/auth/login → 后端 /auth/login）
+//   - /api（本地开发：/api/auth/login）
+//   - /laodongzhongcai/api（直连生产服务器：/laodongzhongcai/api/auth/login）
+const API_BASE_PATHS = ['', '/api', '/laodongzhongcai/api'];
 for (const base of API_BASE_PATHS) {
   app.use(`${base}/auth`, authRoutes);
   app.use(`${base}/case`, caseRoutes);

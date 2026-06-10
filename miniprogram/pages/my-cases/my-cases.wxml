@@ -1,0 +1,39 @@
+<view class="cases-container">
+  <view class="search-bar card">
+    <input class="search-input" placeholder="搜索案件编号/内容..." value="{{keyword}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onSearch" />
+    <text class="search-btn" bindtap="onSearch">🔍</text>
+  </view>
+
+  <view class="filter-tabs">
+    <view class="filter-tab {{filter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="onFilter">全部</view>
+    <view class="filter-tab {{filter === 'pending' ? 'active' : ''}}" data-filter="pending" bindtap="onFilter">待处理</view>
+    <view class="filter-tab {{filter === 'in_progress' ? 'active' : ''}}" data-filter="in_progress" bindtap="onFilter">调解中</view>
+    <view class="filter-tab {{filter === 'completed' ? 'active' : ''}}" data-filter="completed" bindtap="onFilter">已完成</view>
+  </view>
+
+  <block wx:if="{{filteredCases.length > 0}}">
+    <view wx:for="{{filteredCases}}" wx:key="id" class="card case-card" data-id="{{item.id}}" bindtap="goDetail">
+      <view class="flex-between">
+        <view class="case-number font-bold">{{item.caseNumber || '案件'}}</view>
+        <view class="tag" style="color: {{item.statusColor}};">{{item.statusText}}</view>
+      </view>
+      <view class="case-title mt-10">{{item.title || item.disputeType || '劳动争议案件'}}</view>
+      <view class="case-info text-muted text-sm mt-10">
+        <text>调解员：{{item.mediatorName || '待分配'}}</text>
+        <text style="margin-left: 30rpx;">{{item.createTimeText}}</text>
+      </view>
+      <view class="case-actions flex-between mt-20">
+        <button class="btn-sm btn-outline" size="mini" data-id="{{item.id}}" catchtap="sendMessage">💬 留言</button>
+        <button class="btn-sm btn-outline" size="mini" data-id="{{item.id}}" catchtap="goDetail">查看详情 ></button>
+      </view>
+    </view>
+  </block>
+
+  <view wx:else class="empty-state">
+    <view class="empty-state-icon">📭</view>
+    <view class="empty-state-text">暂无案件</view>
+    <button class="btn-outline btn-sm mt-20" bindtap="goApply">申请调解</button>
+  </view>
+
+  <view class="fab" bindtap="goApply"><text>＋</text></view>
+</view>

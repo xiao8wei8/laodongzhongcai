@@ -1,0 +1,193 @@
+.login-container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #e6f7ff 0%, #f5f5f5 60%);
+  padding: 60rpx 40rpx 60rpx;
+  box-sizing: border-box;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 60rpx;
+}
+
+.login-logo {
+  font-size: 140rpx;
+  line-height: 1;
+  margin-bottom: 30rpx;
+}
+
+.login-title {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #1a1a1a;
+  margin-bottom: 14rpx;
+  letter-spacing: 2rpx;
+}
+
+.login-subtitle {
+  font-size: 28rpx;
+  color: #666666;
+  letter-spacing: 4rpx;
+}
+
+/* 登录卡片 */
+.card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 50rpx 40rpx;
+  box-shadow: 0 8rpx 30rpx rgba(24, 144, 255, 0.08);
+}
+
+.login-form {
+  margin-top: 20rpx;
+}
+
+/* 微信主登录按钮：绿色，更醒目 */
+.btn-wechat {
+  background: linear-gradient(90deg, #07c160 0%, #06ad56 100%) !important;
+  color: #fff !important;
+  font-size: 34rpx;
+  font-weight: 500;
+  border-radius: 50rpx;
+  padding: 28rpx 0;
+  margin-bottom: 40rpx;
+  border: none;
+  box-shadow: 0 6rpx 16rpx rgba(7, 193, 96, 0.25);
+}
+
+.btn-wechat::after {
+  border: none;
+}
+
+.wechat-icon {
+  margin-right: 12rpx;
+  font-size: 32rpx;
+}
+
+/* 分割线 */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20rpx 0 40rpx;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2rpx;
+  background: #e8e8e8;
+}
+
+.divider-text {
+  padding: 0 24rpx;
+  font-size: 24rpx;
+  color: #999;
+}
+
+/* 表单字段（增加上下间距） */
+.form-item {
+  margin-bottom: 36rpx;
+}
+
+.form-label {
+  display: block;
+  font-size: 28rpx;
+  color: #333;
+  margin-bottom: 16rpx;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 96rpx;
+  padding: 0 28rpx;
+  background: #f5f7fa;
+  border: 2rpx solid transparent;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.form-input:focus {
+  background: #ffffff;
+  border-color: #1890ff;
+}
+
+/* 用户类型选择卡片 */
+.role-tabs {
+  display: flex;
+  gap: 20rpx;
+}
+
+.role-tab {
+  flex: 1;
+  padding: 36rpx 20rpx;
+  background: #f5f7fa;
+  border-radius: 16rpx;
+  text-align: center;
+  border: 2rpx solid transparent;
+  transition: all 0.2s;
+}
+
+.role-tab.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.role-emoji {
+  font-size: 56rpx;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+.role-text {
+  font-size: 28rpx;
+  color: #333;
+}
+
+.role-tab.active .role-text {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+/* 登录按钮 */
+.btn-primary {
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%) !important;
+  color: #fff !important;
+  font-size: 34rpx;
+  font-weight: 500;
+  border-radius: 50rpx;
+  padding: 28rpx 0;
+  margin-top: 20rpx;
+  border: none;
+  box-shadow: 0 6rpx 16rpx rgba(24, 144, 255, 0.25);
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+/* 底部注册链接 */
+.login-links {
+  text-align: center;
+  margin-top: 40rpx;
+}
+
+.login-links text {
+  color: #1890ff;
+  font-size: 28rpx;
+}
+
+/* 页脚协议 */
+.login-footer {
+  text-align: center;
+  margin-top: 80rpx;
+}
+
+.text-muted {
+  color: #999;
+}
+
+.text-sm {
+  font-size: 24rpx;
+}

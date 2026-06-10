@@ -1,0 +1,91 @@
+<view class="detail-container" wx:if="{{caseDetail.id}}">
+  <!-- 案件基本信息 -->
+  <view class="card">
+    <view class="flex-between">
+      <view class="case-title-lg font-bold">{{caseDetail.caseNumber || '案件编号: ' + caseDetail.id}}</view>
+      <view class="tag" style="color: {{statusColor}};">{{statusText}}</view>
+    </view>
+    <view class="text-muted text-sm mt-10">申请时间：{{createTimeText}}</view>
+  </view>
+
+  <!-- 纠纷信息 -->
+  <view class="card">
+    <view class="card-title">纠纷信息</view>
+    <view class="info-row">
+      <text class="info-label">纠纷类型</text>
+      <text class="info-value">{{caseDetail.disputeType || caseDetail.title || '工资纠纷'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">涉及金额</text>
+      <text class="info-value">{{caseDetail.amount || '0'}} 元</text>
+    </view>
+    <view class="info-row" style="align-items: flex-start;">
+      <text class="info-label">事实描述</text>
+      <text class="info-value text-muted">{{caseDetail.description || caseDetail.facts || '暂无'}}</text>
+    </view>
+    <view class="info-row" style="align-items: flex-start;">
+      <text class="info-label">请求事项</text>
+      <text class="info-value text-muted">{{caseDetail.requests || '暂无'}}</text>
+    </view>
+  </view>
+
+  <!-- 申请人信息 -->
+  <view class="card">
+    <view class="card-title">申请人信息</view>
+    <view class="info-row">
+      <text class="info-label">姓名</text>
+      <text class="info-value">{{applicantInfo.name || caseDetail.applicantName || '-'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">联系电话</text>
+      <text class="info-value">{{applicantInfo.phone || caseDetail.applicantPhone || '-'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">调解员</text>
+      <text class="info-value text-primary">{{mediatorInfo.name || caseDetail.mediatorName || '待分配'}}</text>
+    </view>
+  </view>
+
+  <!-- 调解进度 -->
+  <view class="card">
+    <view class="card-title">调解进度</view>
+    <block wx:if="{{progress.length > 0}}">
+      <view wx:for="{{progress}}" wx:key="id" class="progress-item">
+        <view class="progress-dot {{index === 0 ? 'progress-dot-active' : ''}}"></view>
+        <view class="progress-content">
+          <view class="progress-title">{{item.title || item.content || '进度更新'}}</view>
+          <view class="progress-desc text-muted text-sm">{{item.description || item.remark || ''}}</view>
+          <view class="progress-time text-xs text-muted">{{item.createTimeText}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty-state">
+      <view class="empty-state-icon">📋</view>
+      <view class="empty-state-text">暂无进度记录</view>
+    </view>
+  </view>
+
+  <!-- 留言 -->
+  <view class="card">
+    <view class="card-title">给调解员留言</view>
+    <textarea class="form-textarea" placeholder="在这里输入您的留言..." value="{{newMessage}}" bindinput="onMessageInput" maxlength="500" />
+    <button class="btn-primary btn-sm mt-20" bindtap="submitMessage" loading="{{messageLoading}}" style="width: 100%;">发送</button>
+  </view>
+
+  <!-- 留言列表 -->
+  <view class="card" wx:if="{{messages.length > 0}}">
+    <view class="card-title">历史消息</view>
+    <view wx:for="{{messages}}" wx:key="id" class="message-item">
+      <view class="flex-between">
+        <view class="font-bold text-sm">{{item.senderName || '系统'}}</view>
+        <view class="text-xs text-muted">{{item.createTimeText}}</view>
+      </view>
+      <view class="text-sm mt-10">{{item.content}}</view>
+    </view>
+  </view>
+</view>
+
+<view wx:else class="empty-state">
+  <view class="empty-state-icon">📄</view>
+  <view class="empty-state-text">加载中...</view>
+</view>

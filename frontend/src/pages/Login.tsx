@@ -31,20 +31,20 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: '#f0f2f5'
     }}>
-      <Card 
-        title="劳动仲裁调解系统" 
-        style={{ 
-          width: '90%', 
-          maxWidth: 500, 
-          borderRadius: 8, 
-          padding: '24px', 
+      <Card
+        title="劳动仲裁调解系统"
+        style={{
+          width: '90%',
+          maxWidth: 500,
+          borderRadius: 8,
+          padding: '24px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
         }}
       >
@@ -106,7 +106,7 @@ const Login: React.FC = () => {
             <Link to="/register">还没有账号？去注册</Link>
           </Form.Item>
         </Form>
-        
+
         {/* 测试账号信息 */}
         <div style={{ marginTop: 32 }}>
           <h3 style={{ marginBottom: 16, textAlign: 'center', fontSize: 16, color: '#666' }}>账号提示</h3>

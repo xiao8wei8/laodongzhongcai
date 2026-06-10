@@ -1001,3 +1001,98 @@ const generateAIAnalysisReport = (caseData: any, visitorRecord: any, isVisitorRe
     followUpSuggestions
   };
 };
+
+// 获取当前用户的案件列表（供小程序使用）
+export const getMyCases = async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: '未认证' });
+    }
+
+    const { keyword } = req.query;
+
+    // 获取所有案件
+    const allCases = await caseRepository.findAllWithRelations();
+
+    // 获取到访登记记录
+    const visitorRecords = await visitorRecordRepository.findAll();
+
+    // 根据用户角色过滤 - 只显示当前用户相关的案件
+    const userId = req.user.id;
+    const userName = req.user.name || '';
+
+    let filteredCases = allCases.filter((c: any) => {
+      return c.applicantId === userId ||
+        c.respondentId === userId ||
+        (c.applicantName && c.applicantName === userName) ||
+        (c.respondentName && c.respondentName === userName);
+    });
+
+    // 应用关键词搜索
+    if (keyword) {
+      const searchKeyword = (keyword as string).toLowerCase();
+      filteredCases = filteredCases.filter((c: any) => {
+        return (
+          (c.caseNumber && c.caseNumber.toLowerCase().includes(searchKeyword)) ||
+          (c.applicantName && c.applicantName.includes(keyword as string)) ||
+          (c.respondentName && c.respondentName.includes(keyword as string)) ||
+          (c.disputeType && c.disputeType.includes(keyword as string)) ||
+          (c.requestItems && c.requestItems.toLowerCase().includes(searchKeyword))
+        );
+      });
+    }
+
+    // 将 visitor records 也合并显示（如果该用户是访客）
+    const myVisitorRecords = visitorRecords.filter((v: any) => {
+      return v.visitorName === userName || v.phone === (req.user as any).phone;
+    });
+
+    // 合并结果
+    const mergedResults = [
+      ...filteredCases.map((c: any) => ({
+        id: c.id,
+        type: 'formal',
+        caseNumber: c.caseNumber,
+        title: c.disputeType || '争议调解',
+        description: c.requestItems || '',
+        applicantName: c.applicantName,
+        respondentName: c.respondentName,
+        mediatorId: c.mediatorId,
+        mediatorName: c.mediatorName || '',
+        status: c.status || 'pending',
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt
+      })),
+      ...myVisitorRecords.map((v: any) => ({
+        id: v.id,
+        type: 'visitor',
+        caseNumber: v.registerNumber,
+        title: v.disputeType || '来访登记',
+        description: v.reason || '',
+        applicantName: v.visitorName,
+        respondentName: '',
+        mediatorId: v.mediatorId,
+        mediatorName: '',
+        status: v.status || 'pending',
+        createdAt: v.createdAt,
+        updatedAt: v.updatedAt
+      }))
+    ];
+
+    // 按创建时间倒序排列
+    mergedResults.sort((a: any, b: any) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+
+    res.json({
+      success: true,
+      cases: mergedResults,
+      total: mergedResults.length
+    });
+  } catch (error) {
+    console.error('获取我的案件错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+};

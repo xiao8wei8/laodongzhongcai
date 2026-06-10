@@ -1,0 +1,37 @@
+<view class="messages-container">
+  <view class="tabs">
+    <view class="tab {{activeTab === 'broadcast' ? 'active' : ''}}" bindtap="switchTab" data-tab="broadcast">系统公告</view>
+    <view class="tab {{activeTab === 'message' ? 'active' : ''}}" bindtap="switchTab" data-tab="message">我的消息</view>
+  </view>
+
+  <!-- 系统公告 -->
+  <block wx:if="{{activeTab === 'broadcast'}}">
+    <view wx:if="{{broadcasts.length === 0}}" class="empty-state">
+      <view class="empty-state-icon">📢</view>
+      <view class="empty-state-text">暂无公告</view>
+    </view>
+    <view wx:for="{{broadcasts}}" wx:key="id" class="card broadcast-card">
+      <view class="flex-between">
+        <view class="font-bold">{{item.title || '系统公告'}}</view>
+        <text class="text-xs text-muted">{{item.createTimeText}}</text>
+      </view>
+      <view class="text-sm mt-10" style="line-height: 1.8;">{{item.content || item.summary || ''}}</view>
+    </view>
+  </block>
+
+  <!-- 我的消息 -->
+  <block wx:if="{{activeTab === 'message'}}">
+    <view wx:if="{{messages.length === 0}}" class="empty-state">
+      <view class="empty-state-icon">💬</view>
+      <view class="empty-state-text">暂无消息</view>
+    </view>
+    <view wx:for="{{messages}}" wx:key="id" class="card message-card" data-id="{{item.caseId || item.id}}" bindtap="goCaseDetail">
+      <view class="flex-between">
+        <view class="font-bold">{{item.senderName || '调解员'}}</view>
+        <text class="text-xs text-muted">{{item.createTimeText}}</text>
+      </view>
+      <view class="text-sm text-muted mt-10" style="line-height: 1.6;">{{item.content}}</view>
+      <view wx:if="{{item.caseNumber}}" class="text-xs text-primary mt-10">相关案件：{{item.caseNumber}}</view>
+    </view>
+  </block>
+</view>

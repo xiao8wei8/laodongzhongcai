@@ -1,0 +1,28 @@
+/* pages/home/home.wxss */
+.home-container { padding: 20rpx 30rpx; padding-bottom: 60rpx; }
+
+.welcome-card {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  color: #ffffff;
+  border-radius: 20rpx;
+}
+
+.welcome-card .welcome-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  margin-bottom: 8rpx;
+}
+
+.welcome-card .welcome-role {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.broadcast-item, .case-item {
+  background: transparent;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.broadcast-item:last-child, .case-item:last-child {
+  border-bottom: none;
+}

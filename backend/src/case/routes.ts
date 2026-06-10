@@ -22,7 +22,8 @@ import {
   deleteCaseSchedule,
   handleMediationAgreement,
   exportFile,
-  getAIAnalysis
+  getAIAnalysis,
+  getMyCases
 } from './controller';
 import { auth, roleAuth } from '../middleware/auth';
 
@@ -61,6 +62,7 @@ const router = express.Router();
  *         description: 服务器内部错误
  */
 router.get('/', auth, getCases);
+router.get('/mine', auth, getMyCases);
 
 /**
  * @swagger

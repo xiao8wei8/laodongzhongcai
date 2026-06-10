@@ -18,6 +18,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   login: (username: string, password: string, role: string) => Promise<void>;
+  setAuth: (token: string, userInfo?: Partial<UserInfo>) => void;
   logout: () => void;
   clearError: () => void;
 }
@@ -50,9 +51,27 @@ const useAuthStore = create<AuthState>()(
             error: errorMessage,
             loading: false
           });
-          // 抛出异常，让调用者知道登录失败
           throw new Error(errorMessage);
         }
+      },
+      // 微信登录回调或其他方式：直接通过 token + userInfo 设置登录态
+      setAuth: (token, userInfo) => {
+        set({
+          token,
+          userInfo: userInfo
+            ? {
+                id: userInfo.id || '',
+                username: userInfo.username || 'wechat_user',
+                name: userInfo.name || '微信用户',
+                phone: userInfo.phone || '',
+                email: userInfo.email || '',
+                role: userInfo.role || 'personal'
+              }
+            : null,
+          isAuthenticated: true,
+          error: null,
+          loading: false
+        });
       },
       logout: () => {
         set({

@@ -1,0 +1,63 @@
+<view class="register-container">
+  <view class="register-header">
+    <text class="register-title">注册账号</text>
+    <text class="register-subtitle">快速申请劳动争议调解服务</text>
+  </view>
+
+  <view class="card">
+    <view class="form-item">
+      <text class="form-label form-label-required">角色类型</text>
+      <view class="role-tabs">
+        <view class="role-tab {{form.role === 'personal' ? 'active' : ''}}" data-role="personal" bindtap="onRoleChange">
+          <text>👤 个人</text>
+        </view>
+        <view class="role-tab {{form.role === 'company' ? 'active' : ''}}" data-role="company" bindtap="onRoleChange">
+          <text>🏢 企业</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label form-label-required">用户名</text>
+      <input class="form-input" placeholder="请输入登录账号" value="{{form.username}}" data-field="username" bindinput="onInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label form-label-required">姓名/企业名称</text>
+      <input class="form-input" placeholder="{{form.role === 'personal' ? '请输入真实姓名' : '请输入企业全称'}}" value="{{form.name}}" data-field="name" bindinput="onInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label form-label-required">手机号</text>
+      <input class="form-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{form.phone}}" data-field="phone" bindinput="onInput" />
+    </view>
+
+    <view wx:if="{{form.role === 'personal'}}" class="form-item">
+      <text class="form-label form-label-required">身份证号</text>
+      <input class="form-input" placeholder="请输入身份证号" value="{{form.idCard}}" data-field="idCard" bindinput="onInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">邮箱</text>
+      <input class="form-input" placeholder="选填" value="{{form.email}}" data-field="email" bindinput="onInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label form-label-required">密码</text>
+      <input class="form-input" placeholder="请设置6-20位密码" password value="{{form.password}}" data-field="password" bindinput="onInput" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label form-label-required">确认密码</text>
+      <input class="form-input" placeholder="请再次输入密码" password value="{{form.confirmPassword}}" data-field="confirmPassword" bindinput="onInput" />
+    </view>
+
+    <button class="btn-primary" loading="{{loading}}" disabled="{{loading}}" bindtap="onSubmit">
+      注 册
+    </button>
+
+    <view class="form-item text-center mt-20">
+      <text class="text-primary text-sm" bindtap="goLogin">已有账号？立即登录</text>
+    </view>
+  </view>
+</view>

@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { login, register, getMe, refreshToken, getUsers, updateUser, deleteUser, verifyRegisterToken } from './controller';
+import { login, register, getMe, refreshToken, getUsers, updateUser, deleteUser, verifyRegisterToken, wechatLogin, getWechatWebLoginUrl, wechatWebCallback, pollWechatWebToken } from './controller';
 import { auth, roleAuth } from '../middleware/auth';
 
 const router = express.Router();
@@ -70,6 +70,14 @@ const router = express.Router();
  *         description: 服务器内部错误
  */
 router.post('/login', login);
+
+router.post('/wechat-login', wechatLogin);
+// 【PC 管理端】获取扫码登录 URL
+router.get('/wechat-web-login-url', getWechatWebLoginUrl);
+// 【PC 管理端】微信扫码回调
+router.get('/wechat-web-callback', wechatWebCallback);
+// 【PC 管理端】轮询 token
+router.get('/wechat-web-poll', pollWechatWebToken);
 
 /**
  * @swagger

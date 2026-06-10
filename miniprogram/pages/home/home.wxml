@@ -1,0 +1,83 @@
+<view class="home-container">
+  <!-- 用户欢迎卡片 -->
+  <view class="card welcome-card">
+    <view class="welcome-text">
+      <view class="welcome-title">您好，{{userInfo.name || userInfo.username || '用户'}} 👋</view>
+      <view class="welcome-role text-muted text-sm">{{roleText}}</view>
+    </view>
+  </view>
+
+  <!-- 快捷入口 -->
+  <view class="card">
+    <view class="card-title">快捷入口</view>
+    <view class="quick-entry-grid">
+      <view class="quick-item" bindtap="goApply">
+        <view class="quick-item-icon" style="background: #e6f7ff; color: #1890ff;">📝</view>
+        <view class="quick-item-text">申请调解</view>
+      </view>
+      <view class="quick-item" bindtap="goMyCases">
+        <view class="quick-item-icon" style="background: #f6ffed; color: #52c41a;">📋</view>
+        <view class="quick-item-text">我的案件</view>
+      </view>
+      <view class="quick-item" bindtap="goMessages">
+        <view class="quick-item-icon" style="background: #fff7e6; color: #f5a623;">💬</view>
+        <view class="quick-item-text">消息通知</view>
+      </view>
+      <view class="quick-item" bindtap="goProfile">
+        <view class="quick-item-icon" style="background: #f9f0ff; color: #722ed1;">👤</view>
+        <view class="quick-item-text">个人中心</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 公告通知 -->
+  <view class="card">
+    <view class="flex-between">
+      <view class="card-title" style="margin-bottom: 0;">📢 系统公告</view>
+      <text class="text-muted text-sm" bindtap="goMessages">查看全部 ></text>
+    </view>
+    <view wx:if="{{broadcasts.length === 0}}" class="empty-state">
+      <view class="empty-state-icon">📭</view>
+      <view class="empty-state-text">暂无公告</view>
+    </view>
+    <view wx:for="{{broadcasts}}" wx:key="id" class="list-item broadcast-item">
+      <view class="flex-between">
+        <view class="font-bold" style="max-width: 70%;">{{item.title}}</view>
+        <text class="text-muted text-xs">{{item.createTimeText}}</text>
+      </view>
+      <view class="text-muted text-sm mt-10 text-ellipsis" style="max-width: 100%;">{{item.summary}}</view>
+    </view>
+  </view>
+
+  <!-- 我的案件概览 -->
+  <view class="card">
+    <view class="flex-between">
+      <view class="card-title" style="margin-bottom: 0;">📂 我的案件</view>
+      <text class="text-muted text-sm" bindtap="goMyCases">查看全部 ></text>
+    </view>
+    <view wx:if="{{recentCases.length === 0}}" class="empty-state">
+      <view class="empty-state-icon">📭</view>
+      <view class="empty-state-text">暂无案件记录</view>
+      <button class="btn-outline btn-sm mt-20" bindtap="goApply">立即申请</button>
+    </view>
+    <view wx:for="{{recentCases}}" wx:key="id" class="list-item case-item" data-id="{{item.id}}" bindtap="goCaseDetail">
+      <view class="flex-between">
+        <view class="font-bold text-ellipsis" style="max-width: 60%;">{{item.caseNumber || item.title || '案件'}}</view>
+        <view class="tag" style="background: {{item.statusColor}}; color: {{item.statusColorText}};">{{item.statusText}}</view>
+      </view>
+      <view class="text-muted text-sm mt-10">调解员：{{item.mediatorName || '待分配'}}</view>
+      <view class="text-muted text-xs mt-10">{{item.createTimeText}}</view>
+    </view>
+  </view>
+
+  <!-- 服务说明 -->
+  <view class="card">
+    <view class="card-title">💡 服务说明</view>
+    <view class="text-sm text-muted" style="line-height: 1.8;">
+      <view style="margin-bottom: 16rpx;">• 劳动争议调解是解决劳动纠纷的便捷途径</view>
+      <view style="margin-bottom: 16rpx;">• 调解员全程协助双方协商，达成调解协议</view>
+      <view style="margin-bottom: 16rpx;">• 调解免费、高效，不影响后续仲裁或诉讼</view>
+      <view>• 如有疑问可联系调解员或查看消息通知</view>
+    </view>
+  </view>
+</view>

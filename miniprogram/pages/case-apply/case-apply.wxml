@@ -1,0 +1,140 @@
+<view class="apply-container">
+  <!-- 步骤指示 -->
+  <view class="card steps-card">
+    <view class="steps-row">
+      <view wx:for="{{steps}}" wx:key="index" class="step-item">
+        <view class="step-circle {{currentStep >= index ? 'active' : ''}}">{{index + 1}}</view>
+        <view class="step-label {{currentStep >= index ? 'active' : ''}}">{{item}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Step 1: 身份信息 -->
+  <block wx:if="{{currentStep === 0}}">
+    <view class="card">
+      <view class="card-title">申请人信息</view>
+      <view class="form-item">
+        <text class="form-label form-label-required">姓名</text>
+        <input class="form-input" placeholder="请输入姓名" value="{{form.applicantName}}" data-field="applicantName" bindinput="onInput" />
+      </view>
+      <view class="form-item">
+        <text class="form-label form-label-required">手机号</text>
+        <input class="form-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{form.applicantPhone}}" data-field="applicantPhone" bindinput="onInput" />
+      </view>
+      <view class="form-item">
+        <text class="form-label">身份证号</text>
+        <input class="form-input" placeholder="请输入身份证号" value="{{form.applicantIdCard}}" data-field="applicantIdCard" bindinput="onInput" />
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="card-title">被申请人信息</view>
+      <view class="form-item">
+        <text class="form-label form-label-required">被申请人类型</text>
+        <view class="role-tabs">
+          <view class="role-tab {{form.respondentType === 'company' ? 'active' : ''}}" data-val="company" bindtap="onRespondentType">🏢 企业</view>
+          <view class="role-tab {{form.respondentType === 'personal' ? 'active' : ''}}" data-val="personal" bindtap="onRespondentType">👤 个人</view>
+        </view>
+      </view>
+      <view class="form-item">
+        <text class="form-label form-label-required">{{form.respondentType === 'company' ? '企业名称' : '姓名'}}</text>
+        <input class="form-input" placeholder="请输入名称" value="{{form.respondentName}}" data-field="respondentName" bindinput="onInput" />
+      </view>
+      <view class="form-item">
+        <text class="form-label">联系电话</text>
+        <input class="form-input" type="number" maxlength="11" placeholder="请输入联系电话" value="{{form.respondentPhone}}" data-field="respondentPhone" bindinput="onInput" />
+      </view>
+    </view>
+  </block>
+
+  <!-- Step 2: 案件信息 -->
+  <block wx:if="{{currentStep === 1}}">
+    <view class="card">
+      <view class="card-title">案件信息</view>
+      <view class="form-item">
+        <text class="form-label form-label-required">纠纷类型</text>
+        <picker bindchange="onDisputeTypeChange" range="{{disputeTypes}}" value="{{disputeTypeIndex}}">
+          <view class="picker-view">{{disputeTypes[disputeTypeIndex]}} <text class="text-muted">▼</text></view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">纠纷金额</text>
+        <input class="form-input" type="digit" placeholder="请输入金额（元）" value="{{form.amount}}" data-field="amount" bindinput="onInput" />
+      </view>
+      <view class="form-item">
+        <text class="form-label">发生时间</text>
+        <picker mode="date" value="{{form.happenDate}}" bindchange="onDateChange">
+          <view class="picker-view">{{form.happenDate || '请选择日期'}} <text class="text-muted">▼</text></view>
+        </picker>
+      </view>
+    </view>
+  </block>
+
+  <!-- Step 3: 事实与请求 -->
+  <block wx:if="{{currentStep === 2}}">
+    <view class="card">
+      <view class="card-title">争议事实</view>
+      <textarea class="form-textarea" placeholder="请详细描述纠纷的经过、事实情况..." value="{{form.facts}}" data-field="facts" bindinput="onInput" maxlength="1000" />
+    </view>
+
+    <view class="card">
+      <view class="card-title">请求事项</view>
+      <textarea class="form-textarea" placeholder="请说明您的具体诉求，例如：要求支付拖欠工资、补缴社保等..." value="{{form.requests}}" data-field="requests" bindinput="onInput" maxlength="1000" />
+    </view>
+  </block>
+
+  <!-- Step 4: 证据上传（可选） -->
+  <block wx:if="{{currentStep === 3}}">
+    <view class="card">
+      <view class="card-title">证据材料（可选）</view>
+      <view class="upload-hint text-muted text-sm">支持上传劳动合同、工资条、考勤记录等图片，方便调解员了解情况</view>
+      <view class="upload-area" bindtap="chooseImage">
+        <text class="upload-plus">＋</text>
+        <text class="upload-text">添加图片</text>
+      </view>
+      <view class="image-list" wx:if="{{form.evidenceFiles.length > 0}}">
+        <view wx:for="{{form.evidenceFiles}}" wx:key="index" class="image-item">
+          <image src="{{item}}" mode="aspectFill" />
+          <view class="image-remove" data-index="{{index}}" catchtap="removeImage">×</view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- Step 5: 确认提交 -->
+  <block wx:if="{{currentStep === 4}}">
+    <view class="card">
+      <view class="card-title">确认申请信息</view>
+      <view class="info-row">
+        <text class="info-label">申请人</text>
+        <text class="info-value">{{form.applicantName}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">联系电话</text>
+        <text class="info-value">{{form.applicantPhone}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">被申请人</text>
+        <text class="info-value">{{form.respondentName}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">纠纷类型</text>
+        <text class="info-value">{{disputeTypes[disputeTypeIndex]}}</text>
+      </view>
+      <view class="info-row" style="align-items: flex-start;">
+        <text class="info-label">请求事项</text>
+        <text class="info-value text-muted">{{form.requests}}</text>
+      </view>
+      <view class="confirm-tip text-sm" style="margin-top: 30rpx; padding: 20rpx; background: #fff7e6; border-radius: 12rpx; color: #f5a623;">
+        💡 提交后，调解员将在 1-3 个工作日内与您联系，请保持电话畅通。
+      </view>
+    </view>
+  </block>
+
+  <!-- 底部操作按钮 -->
+  <view class="bottom-actions">
+    <button wx:if="{{currentStep > 0}}" class="btn-outline" bindtap="prevStep">上一步</button>
+    <button wx:if="{{currentStep < 4}}" class="btn-primary" bindtap="nextStep">下一步</button>
+    <button wx:else class="btn-primary" loading="{{submitLoading}}" bindtap="submitCase">确认提交</button>
+  </view>
+</view>

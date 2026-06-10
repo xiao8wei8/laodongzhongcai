@@ -22,13 +22,17 @@ CREATE TABLE IF NOT EXISTS users (
   identity ENUM('applicant', 'respondent') COMMENT '身份',
   caseAmount DECIMAL(15, 2) COMMENT '案件金额',
   idCard VARCHAR(50) COMMENT '身份证号',
+  wechat_mp_openid VARCHAR(255) DEFAULT NULL COMMENT '微信小程序 openid',
+  wechat_web_openid VARCHAR(255) DEFAULT NULL COMMENT '微信网站应用 openid',
   isOnDuty BOOLEAN DEFAULT FALSE COMMENT '是否值班',
   lastOnDutyDate DATETIME COMMENT '最后值班日期',
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX idx_username (username),
   INDEX idx_role (role),
-  INDEX idx_on_duty (role, isOnDuty)
+  INDEX idx_on_duty (role, isOnDuty),
+  INDEX idx_users_wechat_mp_openid (wechat_mp_openid),
+  INDEX idx_users_wechat_web_openid (wechat_web_openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 -- 2. 案件表

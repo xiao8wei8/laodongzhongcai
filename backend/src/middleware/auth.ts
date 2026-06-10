@@ -5,6 +5,9 @@ interface UserPayload {
   id: string;
   username: string;
   role: string;
+  name?: string;
+  phone?: string;
+  email?: string;
 }
 
 // 扩展Request接口

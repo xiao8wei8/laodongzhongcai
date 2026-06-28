@@ -1,36 +1,17 @@
 // utils/api.js - 统一封装 API 请求（复用现有后端接口）
 
 const app = () => getApp();
+const envService = require('./env.js');
 
-const DEV_API_BASE_URL = 'http://192.168.64.17:5003/laodongzhongcai/api';
-const PROD_API_BASE_URL = 'https://www.saifchat.com/laodongzhongcai/api';
-
-function dedupeUrls(urls) {
-  return Array.from(new Set((urls || []).filter(Boolean)));
-}
-
-function normalizeApiBaseUrl(apiBaseUrl) {
-  if (!apiBaseUrl) return '';
-  return String(apiBaseUrl)
-    .replace('http://192.168.64.149:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://127.0.0.1:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://localhost:5003/laodongzhongcai/api', DEV_API_BASE_URL);
-}
+const { normalizeApiBaseUrl, getBaseUrlCandidates } = envService;
 
 // 获取 API 基础地址候选列表
-function getBaseUrlCandidates() {
+function getRequestBaseUrlCandidates() {
   const appInstance = app();
-  const manualApiBaseUrl = normalizeApiBaseUrl(wx.getStorageSync('apiBaseUrlOverride') || '');
   const currentApiBaseUrl = appInstance && appInstance.globalData && appInstance.globalData.apiBaseUrl
     ? normalizeApiBaseUrl(appInstance.globalData.apiBaseUrl)
     : '';
-
-  return dedupeUrls([
-    manualApiBaseUrl,
-    currentApiBaseUrl,
-    DEV_API_BASE_URL,
-    PROD_API_BASE_URL
-  ]);
+  return getBaseUrlCandidates(currentApiBaseUrl);
 }
 
 function persistBaseUrl(baseUrl) {
@@ -53,7 +34,7 @@ function request(options) {
   return new Promise((resolve, reject) => {
     const { url, method = 'GET', data = {}, header = {}, skipAuthRedirect = false } = options;
     const token = getToken();
-    const baseUrlCandidates = getBaseUrlCandidates();
+    const baseUrlCandidates = getRequestBaseUrlCandidates();
 
     const tryRequest = (candidateIndex) => {
       const baseUrl = baseUrlCandidates[candidateIndex];

@@ -1,28 +1,12 @@
-const DEV_API_BASE_URL = 'http://192.168.64.17:5003/laodongzhongcai/api';
-const PROD_API_BASE_URL = 'https://www.saifchat.com/laodongzhongcai/api';
 const SESSION_KEY = 'mini_analytics_session_id';
+const envService = require('./env.js');
 
-function normalizeApiBaseUrl(apiBaseUrl) {
-  if (!apiBaseUrl) return '';
-  return String(apiBaseUrl)
-    .replace('http://192.168.64.149:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://127.0.0.1:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://localhost:5003/laodongzhongcai/api', DEV_API_BASE_URL);
-}
-
-function getBaseUrlCandidates() {
+function getAnalyticsBaseUrlCandidates() {
   const app = getApp ? getApp() : null;
-  const manualApiBaseUrl = normalizeApiBaseUrl(wx.getStorageSync('apiBaseUrlOverride') || wx.getStorageSync('apiBaseUrl') || '');
   const currentApiBaseUrl = app && app.globalData && app.globalData.apiBaseUrl
-    ? normalizeApiBaseUrl(app.globalData.apiBaseUrl)
+    ? app.globalData.apiBaseUrl
     : '';
-
-  return Array.from(new Set([
-    manualApiBaseUrl,
-    currentApiBaseUrl,
-    DEV_API_BASE_URL,
-    PROD_API_BASE_URL
-  ].filter(Boolean)));
+  return envService.getBaseUrlCandidates(currentApiBaseUrl);
 }
 
 function getSessionId() {
@@ -62,7 +46,7 @@ function getSystemMeta() {
 }
 
 function postEvents(events) {
-  const baseUrlCandidates = getBaseUrlCandidates();
+  const baseUrlCandidates = getAnalyticsBaseUrlCandidates();
   const tryPost = (candidateIndex) => new Promise((resolve, reject) => {
     const baseUrl = baseUrlCandidates[candidateIndex];
     if (!baseUrl) {

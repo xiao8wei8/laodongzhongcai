@@ -1,17 +1,9 @@
 // app.js - 小程序入口
 const apiService = require('./utils/api.js');
 const analyticsService = require('./utils/analytics.js');
+const envService = require('./utils/env.js');
 
-const DEV_API_BASE_URL = 'http://192.168.64.17:5003/laodongzhongcai/api';
-const PROD_API_BASE_URL = 'https://www.saifchat.com/laodongzhongcai/api';
-
-function normalizeApiBaseUrl(apiBaseUrl) {
-  if (!apiBaseUrl) return '';
-  return String(apiBaseUrl)
-    .replace('http://192.168.64.149:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://127.0.0.1:5003/laodongzhongcai/api', DEV_API_BASE_URL)
-    .replace('http://localhost:5003/laodongzhongcai/api', DEV_API_BASE_URL);
-}
+const { normalizeApiBaseUrl, resolveApiBaseUrl } = envService;
 
 function getAssetBaseUrl(apiBaseUrl) {
   const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl);
@@ -40,27 +32,6 @@ function normalizeUserInfo(userInfo, apiBaseUrl) {
     ...userInfo,
     avatarUrl: normalizeAvatarUrl(userInfo.avatarUrl, apiBaseUrl)
   };
-}
-
-function resolveApiBaseUrl() {
-  try {
-    const manualApiBaseUrl = normalizeApiBaseUrl(
-      wx.getStorageSync('apiBaseUrlOverride') || wx.getStorageSync('apiBaseUrl')
-    );
-    if (manualApiBaseUrl) {
-      return manualApiBaseUrl;
-    }
-
-    const accountInfo = wx.getAccountInfoSync ? wx.getAccountInfoSync() : null;
-    const envVersion = accountInfo && accountInfo.miniProgram
-      ? accountInfo.miniProgram.envVersion
-      : 'develop';
-
-    // develop / trial 走本地调试；release 走生产域名
-    return envVersion === 'release' ? PROD_API_BASE_URL : DEV_API_BASE_URL;
-  } catch (error) {
-    return DEV_API_BASE_URL;
-  }
 }
 
 let heartbeatTimer = null;

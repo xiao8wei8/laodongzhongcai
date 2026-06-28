@@ -1,6 +1,20 @@
 // pages/login/login.js
 const api = require('../../utils/api.js');
 const util = require('../../utils/util.js');
+const envService = require('../../utils/env.js');
+
+const {
+  DEV_API_BASE_URL,
+  PROD_API_BASE_URL,
+  API_ENV_MODE_AUTO,
+  API_ENV_MODE_DEV,
+  API_ENV_MODE_PROD,
+  getApiEnvModeLabel,
+  detectApiEnvMode,
+  getDefaultApiBaseUrl,
+  getMiniProgramEnvVersion,
+  resolveApiBaseUrl
+} = envService;
 
 Page({
   data: {
@@ -15,11 +29,77 @@ Page({
     tenantKeyword: '',
     showTenantPanel: false,
     agreeProtocol: false,
-    loading: false
+    loading: false,
+    apiEnvMode: API_ENV_MODE_AUTO,
+    apiEnvLabel: getApiEnvModeLabel(API_ENV_MODE_AUTO),
+    currentApiBaseUrl: resolveApiBaseUrl(),
+    miniProgramEnvVersion: getMiniProgramEnvVersion()
   },
 
   onLoad() {
+    this.syncApiEnvState();
     this.loadTenants();
+  },
+
+  syncApiEnvState() {
+    const overrideApiBaseUrl = wx.getStorageSync('apiBaseUrlOverride') || '';
+    const apiEnvMode = detectApiEnvMode(overrideApiBaseUrl);
+    const currentApiBaseUrl = resolveApiBaseUrl();
+    const miniProgramEnvVersion = getMiniProgramEnvVersion();
+    this.setData({
+      apiEnvMode,
+      apiEnvLabel: getApiEnvModeLabel(apiEnvMode),
+      currentApiBaseUrl,
+      miniProgramEnvVersion
+    });
+  },
+
+  openApiEnvSwitcher() {
+    const itemList = [
+      `${this.data.apiEnvMode === API_ENV_MODE_AUTO ? '✓ ' : ''}自动判断`,
+      `${this.data.apiEnvMode === API_ENV_MODE_DEV ? '✓ ' : ''}本地环境`,
+      `${this.data.apiEnvMode === API_ENV_MODE_PROD ? '✓ ' : ''}生产环境`
+    ];
+
+    wx.showActionSheet({
+      alertText: `当前模式：${this.data.apiEnvLabel}\n当前环境：${this.data.miniProgramEnvVersion}\n当前地址：${this.data.currentApiBaseUrl}`,
+      itemList,
+      success: ({ tapIndex }) => {
+        if (tapIndex === 0) {
+          this.applyApiEnvMode(API_ENV_MODE_AUTO);
+          return;
+        }
+        if (tapIndex === 1) {
+          this.applyApiEnvMode(API_ENV_MODE_DEV);
+          return;
+        }
+        if (tapIndex === 2) {
+          this.applyApiEnvMode(API_ENV_MODE_PROD);
+        }
+      }
+    });
+  },
+
+  applyApiEnvMode(mode) {
+    const app = getApp();
+    let targetApiBaseUrl = getDefaultApiBaseUrl();
+
+    if (mode === API_ENV_MODE_AUTO) {
+      wx.removeStorageSync('apiBaseUrlOverride');
+    } else {
+      targetApiBaseUrl = mode === API_ENV_MODE_PROD ? PROD_API_BASE_URL : DEV_API_BASE_URL;
+      wx.setStorageSync('apiBaseUrlOverride', targetApiBaseUrl);
+    }
+
+    app.setApiBaseUrl(mode === API_ENV_MODE_AUTO ? getDefaultApiBaseUrl() : targetApiBaseUrl);
+    this.syncApiEnvState();
+    this.loadTenants();
+
+    wx.showToast({
+      title: `已切换为${getApiEnvModeLabel(mode)}`,
+      icon: 'none',
+      duration: 1800
+    });
   },
 
   finishLogin() {

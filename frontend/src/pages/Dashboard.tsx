@@ -66,6 +66,21 @@ interface Notification {
   }[];
 }
 
+const normalizeNotifications = (payload: Partial<Notification> | null | undefined): Notification => ({
+  overdueCases: Array.isArray(payload?.overdueCases) ? payload!.overdueCases : [],
+  todaySchedule: Array.isArray(payload?.todaySchedule) ? payload!.todaySchedule : [],
+  todayConsultations: Array.isArray(payload?.todayConsultations) ? payload!.todayConsultations : [],
+  systemNotifications: Array.isArray(payload?.systemNotifications) ? payload!.systemNotifications : []
+});
+
+const normalizePendingCases = (payload: Case[] | null | undefined): Case[] => (
+  Array.isArray(payload) ? payload : []
+);
+
+const normalizeBroadcasts = (payload: Broadcast[] | null | undefined): Broadcast[] => (
+  Array.isArray(payload) ? payload : []
+);
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats>({
     totalCases: 0,
@@ -125,12 +140,22 @@ const Dashboard: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.get('/dashboard');
-      setStats(response.data.stats);
-      setPendingCases(response.data.pendingCases);
-      setFilteredCases(response.data.pendingCases);
-      if (response.data.notifications) {
-        setNotifications(response.data.notifications);
-      }
+      const nextStats = response.data?.stats || {
+        totalCases: 0,
+        pendingCases: 0,
+        processingCases: 0,
+        completedCases: 0,
+        failedCases: 0,
+        todayVisitors: 0,
+        aiUsageCount: 0
+      };
+      const nextPendingCases = normalizePendingCases(response.data?.pendingCases);
+      const nextNotifications = normalizeNotifications(response.data?.notifications);
+
+      setStats(nextStats);
+      setPendingCases(nextPendingCases);
+      setFilteredCases(nextPendingCases);
+      setNotifications(nextNotifications);
     } catch (error) {
       message.error('获取工作台数据失败');
     } finally {
@@ -142,7 +167,7 @@ const Dashboard: React.FC = () => {
   const fetchLatestBroadcasts = async () => {
     try {
       const response = await api.get('/broadcast/latest');
-      setLatestBroadcasts(response.data.broadcasts);
+      setLatestBroadcasts(normalizeBroadcasts(response.data?.broadcasts));
       setUnreadBroadcastCount(response.data.unreadCount || 0);
     } catch (error) {
       console.error('获取最新广播失败:', error);

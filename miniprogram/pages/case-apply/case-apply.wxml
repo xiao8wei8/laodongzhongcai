@@ -1,4 +1,15 @@
 <view class="apply-container">
+  <view wx:if="{{isGuestMode}}" class="empty-state">
+    <view class="empty-state-icon">🔐</view>
+    <view class="empty-state-text">登录后可提交调解申请</view>
+    <button class="btn-outline btn-sm mt-20" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
+  <view class="mock-actions">
+    <button class="btn-outline mock-btn" bindtap="regenerateMockData">重新生成测试数据</button>
+  </view>
+
   <!-- 步骤指示 -->
   <view class="card steps-card">
     <view class="steps-row">
@@ -22,8 +33,24 @@
         <input class="form-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{form.applicantPhone}}" data-field="applicantPhone" bindinput="onInput" />
       </view>
       <view class="form-item">
-        <text class="form-label">身份证号</text>
+        <text class="form-label form-label-required">身份证号</text>
         <input class="form-input" placeholder="请输入身份证号" value="{{form.applicantIdCard}}" data-field="applicantIdCard" bindinput="onInput" />
+      </view>
+      <view class="form-item">
+        <text class="form-label form-label-required">受理街道</text>
+        <picker bindchange="onTenantChange" range="{{tenants}}" range-key="tenantName" value="{{tenantIndex}}">
+          <view class="picker-view">{{tenantLabel}} <text class="text-muted">▼</text></view>
+        </picker>
+      </view>
+      <view class="mediator-card" wx:if="{{form.tenantId}}">
+        <view class="mediator-title">当前接收人</view>
+        <view wx:if="{{mediatorLoading}}" class="text-muted text-sm">正在查询当前值班调解员...</view>
+        <block wx:elif="{{currentMediator}}">
+          <view class="mediator-name">{{currentMediator.name}}</view>
+          <view class="mediator-meta">{{currentMediator.role === 'tenant_admin' ? '街道管理员临时接收' : '值班调解员'}}{{currentMediator.phone ? ' · ' + currentMediator.phone : ''}}</view>
+        </block>
+        <view wx:else class="text-muted text-sm">当前街道暂未配置值班人员，提交后将由后台补充处理</view>
+        <view class="mediator-hint" wx:if="{{mediatorHint}}">{{mediatorHint}}</view>
       </view>
     </view>
 
@@ -41,7 +68,7 @@
         <input class="form-input" placeholder="请输入名称" value="{{form.respondentName}}" data-field="respondentName" bindinput="onInput" />
       </view>
       <view class="form-item">
-        <text class="form-label">联系电话</text>
+        <text class="form-label form-label-required">联系电话</text>
         <input class="form-input" type="number" maxlength="11" placeholder="请输入联系电话" value="{{form.respondentPhone}}" data-field="respondentPhone" bindinput="onInput" />
       </view>
     </view>
@@ -114,6 +141,14 @@
         <text class="info-value">{{form.applicantPhone}}</text>
       </view>
       <view class="info-row">
+        <text class="info-label">受理街道</text>
+        <text class="info-value">{{form.tenantName}}</text>
+      </view>
+      <view class="info-row" wx:if="{{currentMediator}}">
+        <text class="info-label">当前接收人</text>
+        <text class="info-value">{{currentMediator.name}}{{currentMediator.phone ? '（' + currentMediator.phone + '）' : ''}}</text>
+      </view>
+      <view class="info-row">
         <text class="info-label">被申请人</text>
         <text class="info-value">{{form.respondentName}}</text>
       </view>
@@ -131,10 +166,13 @@
     </view>
   </block>
 
+  <view class="bottom-actions-placeholder"></view>
+
   <!-- 底部操作按钮 -->
-  <view class="bottom-actions">
+  <view wx:if="{{showBottomActions}}" class="bottom-actions page-fixed-entrance">
     <button wx:if="{{currentStep > 0}}" class="btn-outline" bindtap="prevStep">上一步</button>
     <button wx:if="{{currentStep < 4}}" class="btn-primary" bindtap="nextStep">下一步</button>
     <button wx:else class="btn-primary" loading="{{submitLoading}}" bindtap="submitCase">确认提交</button>
   </view>
+  </block>
 </view>

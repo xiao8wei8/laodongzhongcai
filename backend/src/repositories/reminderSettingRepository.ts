@@ -57,8 +57,6 @@ class ReminderSettingRepository extends BaseRepository<ReminderSetting> {
 
   async createDefaultSettings(userId: string): Promise<void> {
     const defaultSettings = [
-      { type: 'email', enabled: true, advanceTime: 30 },
-      { type: 'sms', enabled: true, advanceTime: 30 },
       { type: 'in_app', enabled: true, advanceTime: 15 }
     ];
 

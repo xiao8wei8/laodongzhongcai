@@ -2,9 +2,9 @@ import express from 'express';
 import { exec, spawn } from 'child_process';
 import path from 'path';
 import axios from 'axios';
-import config from '../config';
 import pool from '../config/mysql';
 import { io } from '../server';
+import { writeOperationLog } from '../utils/audit';
 
 // 服务进程管理
 const serviceProcesses: Record<string, any> = {};
@@ -45,69 +45,6 @@ export const checkServiceStatus = [
         frontendStatus = 'disconnected';
         frontendMessage = '前端页面访问失败';
       }
-
-
-
-      // 检查短信服务状态
-      let smsStatus = 'unknown';
-      let smsMessage = '短信服务状态需要通过配置检查';
-      try {
-        const { sms } = config;
-        const requiredFields = [
-          sms.secretId,
-          sms.secretKey,
-          sms.sdkAppId,
-          sms.signName,
-          sms.templateIds.verification,
-          sms.templateIds.notification,
-          sms.templateIds.registerSuccess
-        ];
-        
-        const allFieldsPresent = requiredFields.every(field => field && field.trim() !== '');
-        
-        if (allFieldsPresent) {
-          smsStatus = 'configured';
-          smsMessage = '短信服务配置完整';
-        } else {
-          smsStatus = 'incomplete';
-          smsMessage = '短信服务配置不完整';
-        }
-      } catch (error) {
-        console.error('检查短信服务状态失败:', error);
-        smsStatus = 'error';
-        smsMessage = '短信服务配置错误';
-      }
-
-      // 检查邮件服务状态
-      let emailStatus = 'unknown';
-      let emailMessage = '邮件服务状态需要通过配置检查';
-      try {
-        const { email } = config;
-        const requiredFields = [
-          email.secretId,
-          email.secretKey,
-          email.sender.email,
-          email.sender.name,
-          email.templates.registerSuccess,
-          email.templates.passwordReset,
-          email.templates.caseNotification
-        ];
-        
-        const allFieldsPresent = requiredFields.every(field => field && field.trim() !== '');
-        
-        if (allFieldsPresent) {
-          emailStatus = 'configured';
-          emailMessage = '邮件服务配置完整';
-        } else {
-          emailStatus = 'incomplete';
-          emailMessage = '邮件服务配置不完整';
-        }
-      } catch (error) {
-        console.error('检查邮件服务状态失败:', error);
-        emailStatus = 'error';
-        emailMessage = '邮件服务配置错误';
-      }
-
       // 检查 Socket.IO 服务状态
       let socketStatus = 'running';
       let socketMessage = 'Socket.IO 服务运行正常';
@@ -143,16 +80,6 @@ export const checkServiceStatus = [
         frontend: {
           status: frontendStatus,
           message: frontendMessage,
-          timestamp: new Date().toISOString()
-        },
-        sms: {
-          status: smsStatus,
-          message: smsMessage,
-          timestamp: new Date().toISOString()
-        },
-        email: {
-          status: emailStatus,
-          message: emailMessage,
           timestamp: new Date().toISOString()
         },
         socket: {
@@ -229,9 +156,28 @@ export const startService = [
       // 允许进程独立运行
       process.unref();
 
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'start_service',
+        targetType: 'service',
+        targetDisplay: serviceName,
+        result: 'success',
+        detail: `启动服务 ${serviceName}`
+      });
+
       res.json({ success: true, message: `服务 ${serviceName} 启动成功` });
     } catch (error) {
       console.error('启动服务失败:', error);
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'start_service',
+        targetType: 'service',
+        targetDisplay: req.body?.serviceName,
+        result: 'failed',
+        errorMessage: (error as any).message || '启动服务失败'
+      });
       res.status(500).json({ success: false, message: '服务器内部错误' });
     }
   }
@@ -260,9 +206,28 @@ export const stopService = [
       // 删除服务进程信息
       delete serviceProcesses[serviceName];
 
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'stop_service',
+        targetType: 'service',
+        targetDisplay: serviceName,
+        result: 'success',
+        detail: `停止服务 ${serviceName}`
+      });
+
       res.json({ success: true, message: `服务 ${serviceName} 停止成功` });
     } catch (error) {
       console.error('停止服务失败:', error);
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'stop_service',
+        targetType: 'service',
+        targetDisplay: req.body?.serviceName,
+        result: 'failed',
+        errorMessage: (error as any).message || '停止服务失败'
+      });
       res.status(500).json({ success: false, message: '服务器内部错误' });
     }
   }
@@ -320,9 +285,28 @@ export const restartService = [
       // 允许进程独立运行
       process.unref();
 
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'restart_service',
+        targetType: 'service',
+        targetDisplay: serviceName,
+        result: 'success',
+        detail: `重启服务 ${serviceName}`
+      });
+
       res.json({ success: true, message: `服务 ${serviceName} 重启成功` });
     } catch (error) {
       console.error('重启服务失败:', error);
+      await writeOperationLog({
+        req,
+        module: 'service_management',
+        action: 'restart_service',
+        targetType: 'service',
+        targetDisplay: req.body?.serviceName,
+        result: 'failed',
+        errorMessage: (error as any).message || '重启服务失败'
+      });
       res.status(500).json({ success: false, message: '服务器内部错误' });
     }
   }

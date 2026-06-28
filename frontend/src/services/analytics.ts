@@ -1,4 +1,5 @@
 // 用户行为统计服务
+import useAuthStore from '../store/authStore';
 
 // 获取API基础URL
 const getApiBaseUrl = () => {
@@ -9,6 +10,12 @@ const getApiBaseUrl = () => {
   return baseUrl;
 };
 
+const ANALYTICS_DISABLED_KEY = 'analytics_disabled';
+
+const isAnalyticsDisabled = () => localStorage.getItem(ANALYTICS_DISABLED_KEY) === 'true';
+const disableAnalytics = () => localStorage.setItem(ANALYTICS_DISABLED_KEY, 'true');
+const isIgnoredPath = (pathname: string) => ['/login'].includes(pathname);
+
 // 埋点数据类型
 interface TrackEvent {
   event: string;
@@ -18,6 +25,10 @@ interface TrackEvent {
   value?: number;
   timestamp: number;
   userId?: string;
+  username?: string;
+  role?: string;
+  tenantId?: string;
+  clientType?: string;
   sessionId: string;
   page: string;
   referrer: string;
@@ -49,11 +60,29 @@ const getSessionId = (): string => {
   return sessionId;
 };
 
+const getAuthSnapshot = () => {
+  const state = useAuthStore.getState();
+  const currentUser = state?.userInfo;
+  return {
+    userId: currentUser?.id,
+    username: currentUser?.username || currentUser?.name,
+    role: currentUser?.role,
+    tenantId: currentUser?.tenantId,
+    clientType: 'pc_admin' as const
+  };
+};
+
 // 发送埋点数据
 const sendEvent = (event: TrackEvent) => {
+  if (isAnalyticsDisabled() || isIgnoredPath(window.location.pathname)) {
+    return;
+  }
   // 批量发送，减少请求次数
   const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
-  events.push(event);
+  events.push({
+    ...event,
+    ...getAuthSnapshot()
+  });
   localStorage.setItem('analytics_events', JSON.stringify(events));
   
   // 当事件数量达到10个或超过5秒时发送
@@ -68,26 +97,37 @@ const sendEvent = (event: TrackEvent) => {
 
 // 发送所有待处理的事件
 const flushEvents = async () => {
+  if (isAnalyticsDisabled() || isIgnoredPath(window.location.pathname)) {
+    localStorage.setItem('analytics_events', '[]');
+    return;
+  }
   const events = JSON.parse(localStorage.getItem('analytics_events') || '[]');
   if (events.length === 0) return;
   
   try {
-    await fetch(`${getApiBaseUrl()}/analytics/track`, {
+    const response = await fetch(`${getApiBaseUrl()}/analytics/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ events })
     });
+    if (!response.ok) {
+      disableAnalytics();
+      localStorage.setItem('analytics_events', '[]');
+      return;
+    }
     // 发送成功后清空事件
     localStorage.setItem('analytics_events', '[]');
   } catch (error) {
-    console.error('发送埋点数据失败:', error);
+    disableAnalytics();
+    localStorage.setItem('analytics_events', '[]');
   }
 };
 
 // 页面访问统计
 export const trackPageView = (page: string) => {
+  if (isIgnoredPath(page)) return;
   const event: TrackEvent = {
     event: 'page_view',
     category: 'page',
@@ -104,8 +144,26 @@ export const trackPageView = (page: string) => {
   sendEvent(event);
 };
 
+export const trackHeartbeat = (page: string = window.location.pathname) => {
+  if (isIgnoredPath(page)) return;
+  const event: TrackEvent = {
+    event: 'heartbeat',
+    category: 'engagement',
+    action: 'heartbeat',
+    timestamp: Date.now(),
+    sessionId: getSessionId(),
+    page,
+    referrer: document.referrer,
+    userAgent: navigator.userAgent,
+    screenWidth: window.screen.width,
+    screenHeight: window.screen.height
+  };
+  sendEvent(event);
+};
+
 // 点击事件统计
 export const trackClick = (category: string, action: string, label?: string, value?: number) => {
+  if (isIgnoredPath(window.location.pathname)) return;
   const event: TrackEvent = {
     event: 'click',
     category,
@@ -125,6 +183,7 @@ export const trackClick = (category: string, action: string, label?: string, val
 
 // 性能统计
 export const trackPerformance = () => {
+  if (isIgnoredPath(window.location.pathname)) return;
   if (performance && performance.timing) {
     const timing = performance.timing;
     const event: TrackEvent = {
@@ -151,6 +210,7 @@ export const trackPerformance = () => {
 
 // 错误统计
 export const trackError = (error: Error, url?: string, line?: number, column?: number) => {
+  if (isIgnoredPath(window.location.pathname)) return;
   const event: TrackEvent = {
     event: 'error',
     category: 'error',
@@ -189,6 +249,12 @@ export const initAnalytics = () => {
     trackPageView(window.location.pathname);
     return result;
   };
+
+  window.setInterval(() => {
+    const { token } = useAuthStore.getState();
+    if (!token) return;
+    trackHeartbeat(window.location.pathname);
+  }, 5 * 60 * 1000);
   
   // 监听错误
   window.addEventListener('error', (event) => {

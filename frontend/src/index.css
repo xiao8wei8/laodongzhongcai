@@ -14,6 +14,16 @@ body {
   min-height: 100vh;
 }
 
+:root {
+  --page-radius-xl: 20px;
+  --page-radius-lg: 18px;
+  --page-radius-md: 16px;
+  --page-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --page-shadow-strong: 0 24px 80px rgba(15, 23, 42, 0.28);
+  --page-text-muted: #64748b;
+  --page-border-soft: #edf2f7;
+}
+
 /* 响应式设计全局规则 */
 @media (max-width: 768px) {
   .ant-card {
@@ -85,4 +95,229 @@ a:hover {
 /* 确保卡片在移动设备上有适当的边距 */
 .ant-card {
   margin-bottom: 24px;
+}
+
+.page-shell {
+  padding: 4px;
+}
+
+.page-hero {
+  margin-bottom: 20px;
+  border-radius: var(--page-radius-xl);
+  overflow: hidden;
+  color: #fff;
+}
+
+.page-hero > .ant-card-body {
+  padding: 24px;
+}
+
+.page-hero--blue {
+  background: linear-gradient(135deg, #0f172a 0%, #1677ff 100%);
+}
+
+.page-hero--teal {
+  background: linear-gradient(135deg, #0f172a 0%, #0ea5a4 100%);
+}
+
+.page-hero--violet {
+  background: linear-gradient(135deg, #0f172a 0%, #7c3aed 100%);
+}
+
+.session-restore-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 42%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  padding: 24px;
+}
+
+.session-restore-card {
+  min-width: 280px;
+  max-width: 360px;
+  padding: 28px 24px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.session-restore-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 3px solid rgba(22, 119, 255, 0.18);
+  border-top-color: #1677ff;
+  animation: session-restore-spin 0.9s linear infinite;
+}
+
+.session-restore-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.session-restore-desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+@keyframes session-restore-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-hero--slate {
+  background: linear-gradient(135deg, #0f172a 0%, #1f2937 100%);
+}
+
+.page-hero__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.page-hero__title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-hero__description {
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.8;
+  margin-top: 4px;
+}
+
+.page-hero__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-hero__note .ant-alert {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.page-hero__note .ant-alert .ant-alert-message,
+.page-hero__note .ant-alert .ant-alert-description,
+.page-hero__note .ant-alert .ant-alert-icon {
+  color: inherit;
+}
+
+.page-metric-grid {
+  margin-bottom: 20px;
+}
+
+.page-metric-card,
+.page-section-card {
+  border-radius: var(--page-radius-lg);
+  box-shadow: var(--page-shadow-soft);
+}
+
+.page-section-card__body {
+  padding: 22px;
+}
+
+.page-section-card > .ant-card-body {
+  padding: 0;
+}
+
+.page-toolbar {
+  margin-bottom: 20px;
+  border-radius: var(--page-radius-lg);
+  box-shadow: var(--page-shadow-soft);
+}
+
+.page-toolbar > .ant-card-body {
+  padding: 0;
+}
+
+.page-toolbar__body {
+  padding: 22px;
+}
+
+.page-surface-card {
+  border-radius: var(--page-radius-lg);
+  box-shadow: var(--page-shadow-soft);
+}
+
+.page-surface-card > .ant-card-body {
+  padding: 22px;
+}
+
+.page-auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+  padding: 24px;
+}
+
+.page-auth-card {
+  width: 100%;
+  max-width: 1120px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--page-shadow-strong);
+}
+
+.page-auth-card > .ant-card-body {
+  padding: 0;
+}
+
+.page-auth-panel--aside {
+  padding: 32px;
+  min-height: 720px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+}
+
+.page-auth-panel--main {
+  padding: 32px;
+  min-height: 720px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.page-auth-note-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.page-auth-note-card {
+  padding: 16px;
+  border-radius: var(--page-radius-md);
+  background: #fff;
+  border: 1px solid var(--page-border-soft);
+}
+
+@media (max-width: 992px) {
+  .page-auth-panel--aside,
+  .page-auth-panel--main {
+    min-height: auto;
+  }
 }

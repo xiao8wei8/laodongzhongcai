@@ -9,6 +9,7 @@ interface Broadcast {
   urgency: string;
   status: 'pending' | 'approved' | 'rejected';
   creatorId: string;
+  tenantId?: string | null;
   approverId?: string;
   approvalTime?: Date;
   rejectionReason?: string;

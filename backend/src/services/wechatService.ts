@@ -21,6 +21,23 @@ export interface JsCode2SessionResult {
   errmsg?: string;
 }
 
+interface AccessTokenResult {
+  access_token: string;
+  expires_in: number;
+  errcode?: number;
+  errmsg?: string;
+}
+
+interface GetPhoneNumberResult {
+  phone_info?: {
+    phoneNumber: string;
+    purePhoneNumber: string;
+    countryCode: string;
+  };
+  errcode?: number;
+  errmsg?: string;
+}
+
 /** 网页扫码登录 access_token 返回 */
 export interface WebAccessTokenResult {
   access_token: string;
@@ -84,6 +101,53 @@ function httpsGet<T>(urlStr: string): Promise<T> {
   });
 }
 
+function httpsPost<T>(urlStr: string, body: Record<string, any>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlStr);
+    const payload = JSON.stringify(body);
+
+    const req = https.request(
+      {
+        host: url.hostname,
+        path: url.pathname + url.search,
+        port: 443,
+        method: 'POST',
+        timeout: 8000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        }
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.errcode && parsed.errcode !== 0) {
+              reject(new Error(`微信 API 错误: ${parsed.errmsg || data}`));
+            } else {
+              resolve(parsed as T);
+            }
+          } catch (e) {
+            reject(new Error('微信返回数据解析失败: ' + data));
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('微信 API 请求超时'));
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+let cachedMiniProgramAccessToken: { token: string; expireAt: number } | null = null;
+
 /**
  * 【小程序端】用 wx.login 返回的 code 换取 openid
  * 文档：https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/login/auth.code2Session.html
@@ -97,6 +161,41 @@ export async function jscode2session(code: string): Promise<JsCode2SessionResult
     `&secret=${wechatConfig.miniprogram.secret}` +
     `&js_code=${code}&grant_type=authorization_code`;
   return httpsGet<JsCode2SessionResult>(url);
+}
+
+export async function getMiniProgramAccessToken(): Promise<string> {
+  if (cachedMiniProgramAccessToken && cachedMiniProgramAccessToken.expireAt > Date.now()) {
+    return cachedMiniProgramAccessToken.token;
+  }
+
+  if (!wechatConfig.miniprogram.appid || !wechatConfig.miniprogram.secret) {
+    throw new Error('未配置 WECHAT_MP_APPID / WECHAT_MP_SECRET');
+  }
+
+  const url =
+    `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential` +
+    `&appid=${wechatConfig.miniprogram.appid}` +
+    `&secret=${wechatConfig.miniprogram.secret}`;
+
+  const result = await httpsGet<AccessTokenResult>(url);
+  cachedMiniProgramAccessToken = {
+    token: result.access_token,
+    expireAt: Date.now() + Math.max((result.expires_in - 300), 60) * 1000,
+  };
+  return result.access_token;
+}
+
+export async function getUserPhoneNumber(code: string): Promise<string> {
+  const accessToken = await getMiniProgramAccessToken();
+  const url = `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${accessToken}`;
+  const result = await httpsPost<GetPhoneNumberResult>(url, { code });
+  const phoneNumber = result.phone_info?.purePhoneNumber || result.phone_info?.phoneNumber;
+
+  if (!phoneNumber) {
+    throw new Error('微信未返回手机号');
+  }
+
+  return phoneNumber;
 }
 
 /**
@@ -158,6 +257,8 @@ export async function webCodeToUser(code: string): Promise<{
 
 export default {
   jscode2session,
+  getMiniProgramAccessToken,
+  getUserPhoneNumber,
   generateWebLoginUrl,
   getWebAccessToken,
   getWebUserInfo,

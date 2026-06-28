@@ -71,6 +71,23 @@ function getUserInfo() {
   return wx.getStorageSync('userInfo');
 }
 
+function goLogin() {
+  wx.navigateTo({ url: '/pages/login/login' });
+}
+
+function promptLogin(message = '登录后可继续使用该功能') {
+  wx.showModal({
+    title: '提示',
+    content: message,
+    confirmText: '去登录',
+    success: (res) => {
+      if (res.confirm) {
+        goLogin();
+      }
+    }
+  });
+}
+
 // 角色映射
 function getRoleText(role) {
   const map = {
@@ -86,6 +103,7 @@ function getRoleText(role) {
 function getCaseStatus(status) {
   const map = {
     pending: '待处理',
+    processing: '处理中',
     in_progress: '调解中',
     completed: '已完成',
     cancelled: '已取消',
@@ -98,6 +116,7 @@ function getCaseStatus(status) {
 function getCaseStatusColor(status) {
   const map = {
     pending: '#f5a623',
+    processing: '#1890ff',
     in_progress: '#1890ff',
     completed: '#52c41a',
     cancelled: '#999999',
@@ -116,11 +135,6 @@ function validateIdCard(idCard) {
   return /^\d{17}[\dXx]$/.test(idCard);
 }
 
-// 邮箱验证
-function validateEmail(email) {
-  return /^[\w.-]+@[\w.-]+\.\w+$/.test(email);
-}
-
 module.exports = {
   formatTime,
   formatDate,
@@ -133,10 +147,11 @@ module.exports = {
   showConfirm,
   isLoggedIn,
   getUserInfo,
+  goLogin,
+  promptLogin,
   getRoleText,
   getCaseStatus,
   getCaseStatusColor,
   validatePhone,
-  validateIdCard,
-  validateEmail
+  validateIdCard
 };

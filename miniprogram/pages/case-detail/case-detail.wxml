@@ -10,22 +10,22 @@
 
   <!-- 纠纷信息 -->
   <view class="card">
-    <view class="card-title">纠纷信息</view>
+    <view class="card-title">{{isConsultation ? '咨询内容' : '纠纷信息'}}</view>
     <view class="info-row">
-      <text class="info-label">纠纷类型</text>
+      <text class="info-label">{{isConsultation ? '业务类型' : '纠纷类型'}}</text>
       <text class="info-value">{{caseDetail.disputeType || caseDetail.title || '工资纠纷'}}</text>
     </view>
-    <view class="info-row">
+    <view class="info-row" wx:if="{{!isConsultation}}">
       <text class="info-label">涉及金额</text>
-      <text class="info-value">{{caseDetail.amount || '0'}} 元</text>
+      <text class="info-value">{{caseDetail.caseAmount || caseDetail.amount || '0'}} 元</text>
     </view>
     <view class="info-row" style="align-items: flex-start;">
-      <text class="info-label">事实描述</text>
-      <text class="info-value text-muted">{{caseDetail.description || caseDetail.facts || '暂无'}}</text>
+      <text class="info-label">{{isConsultation ? '咨询内容' : '事实描述'}}</text>
+      <text class="info-value text-muted">{{caseDetail.factsReasons || caseDetail.description || caseDetail.facts || '暂无'}}</text>
     </view>
-    <view class="info-row" style="align-items: flex-start;">
+    <view class="info-row" style="align-items: flex-start;" wx:if="{{!isConsultation}}">
       <text class="info-label">请求事项</text>
-      <text class="info-value text-muted">{{caseDetail.requests || '暂无'}}</text>
+      <text class="info-value text-muted">{{caseDetail.requestItems || caseDetail.requests || '暂无'}}</text>
     </view>
   </view>
 
@@ -34,15 +34,36 @@
     <view class="card-title">申请人信息</view>
     <view class="info-row">
       <text class="info-label">姓名</text>
-      <text class="info-value">{{applicantInfo.name || caseDetail.applicantName || '-'}}</text>
+      <text class="info-value">{{applicantInfo.name || caseDetail.applicantDisplayName || caseDetail.applicantName || '-'}}</text>
     </view>
     <view class="info-row">
       <text class="info-label">联系电话</text>
-      <text class="info-value">{{applicantInfo.phone || caseDetail.applicantPhone || '-'}}</text>
+      <text class="info-value">{{caseDetail.applicantPhone || applicantInfo.phone || '-'}}</text>
     </view>
     <view class="info-row">
       <text class="info-label">调解员</text>
       <text class="info-value text-primary">{{mediatorInfo.name || caseDetail.mediatorName || '待分配'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">调解员电话</text>
+      <text class="info-value">{{mediatorInfo.phone || caseDetail.mediatorPhone || '-'}}</text>
+    </view>
+  </view>
+
+  <!-- 被申请人信息 -->
+  <view class="card" wx:if="{{!isConsultation}}">
+    <view class="card-title">被申请人信息</view>
+    <view class="info-row">
+      <text class="info-label">名称</text>
+      <text class="info-value">{{respondentInfo.name || caseDetail.respondentDisplayName || caseDetail.respondentName || '-'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">联系电话</text>
+      <text class="info-value">{{caseDetail.respondentPhone || respondentInfo.phone || '-'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">类型</text>
+      <text class="info-value">{{respondentInfo.type === 'personal' ? '个人' : '企业'}}</text>
     </view>
   </view>
 
@@ -68,8 +89,11 @@
   <!-- 留言 -->
   <view class="card">
     <view class="card-title">给调解员留言</view>
-    <textarea class="form-textarea" placeholder="在这里输入您的留言..." value="{{newMessage}}" bindinput="onMessageInput" maxlength="500" />
-    <button class="btn-primary btn-sm mt-20" bindtap="submitMessage" loading="{{messageLoading}}" style="width: 100%;">发送</button>
+    <view wx:if="{{!mediatorInfo.id}}" class="text-muted text-sm" style="line-height: 1.8;">当前案件尚未分配调解员，暂时无法留言。</view>
+    <block wx:else>
+      <textarea class="form-textarea" placeholder="在这里输入您的留言..." value="{{newMessage}}" bindinput="onMessageInput" maxlength="500" />
+      <button class="btn-primary btn-sm mt-20" bindtap="submitMessage" loading="{{messageLoading}}" style="width: 100%;">发送</button>
+    </block>
   </view>
 
   <!-- 留言列表 -->

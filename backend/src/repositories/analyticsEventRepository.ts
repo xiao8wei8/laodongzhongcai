@@ -61,7 +61,9 @@ class AnalyticsEventRepository extends BaseRepository<AnalyticsEvent> {
     
     // 将 eventData JSON 解析为对象属性
     const events = (rows as any[]).map(row => {
-      const eventData = row.eventData ? JSON.parse(row.eventData) : {};
+      const eventData = typeof row.eventData === 'string'
+        ? JSON.parse(row.eventData)
+        : (row.eventData || {});
       return {
         ...row,
         ...eventData
@@ -69,10 +71,10 @@ class AnalyticsEventRepository extends BaseRepository<AnalyticsEvent> {
     });
     
     // 应用额外的过滤条件
-    return events.filter(event => {
-      if (event && event.event !== event) return false;
-      if (category && event.category !== category) return false;
-      if (page && event.page !== page) return false;
+    return events.filter(item => {
+      if (event && item.event !== event) return false;
+      if (category && item.category !== category) return false;
+      if (page && item.page !== page) return false;
       return true;
     });
   }

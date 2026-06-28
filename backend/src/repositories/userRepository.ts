@@ -10,13 +10,17 @@ interface User {
   officePhone?: string;
   phone?: string;
   email?: string;
+  nickname?: string;
+  avatarUrl?: string;
   address?: string;
   street?: string;
   department?: string;
-  role: 'mediator' | 'admin' | 'personal' | 'company';
+  tenantId?: string | null;
+  role: 'superadmin' | 'tenant_admin' | 'mediator' | 'admin' | 'personal' | 'company';
   identity?: 'applicant' | 'respondent';
   caseAmount?: number;
   idCard?: string;
+  isSuperAdmin?: boolean;
   isOnDuty?: boolean;
   lastOnDutyDate?: Date;
   createdAt: Date;

@@ -9,6 +9,7 @@ import express from 'express';
 import { 
   getCases, 
   getCaseById, 
+  getCaseProgress,
   createCase, 
   updateCaseStatus, 
   assignMediator, 
@@ -16,6 +17,8 @@ import {
   getCaseMeetings, 
   createCaseMeeting, 
   addCaseProgress,
+  getScheduleOverview,
+  getMediatorAnalysisSummary,
   addCaseSchedule,
   getCaseSchedules,
   updateCaseSchedule,
@@ -63,6 +66,8 @@ const router = express.Router();
  */
 router.get('/', auth, getCases);
 router.get('/mine', auth, getMyCases);
+router.get('/schedules/overview', auth, getScheduleOverview);
+router.get('/mediator-analysis/summary', auth, roleAuth(['mediator']), getMediatorAnalysisSummary);
 
 /**
  * @swagger
@@ -192,7 +197,7 @@ router.post('/', auth, createCase);
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/:id/status', [auth, roleAuth(['mediator', 'admin'])], updateCaseStatus);
+router.put('/:id/status', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], updateCaseStatus);
 
 /**
  * @swagger
@@ -233,7 +238,7 @@ router.put('/:id/status', [auth, roleAuth(['mediator', 'admin'])], updateCaseSta
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/:id/mediator', [auth, roleAuth(['admin'])], assignMediator);
+router.put('/:id/mediator', [auth, roleAuth(['tenant_admin', 'superadmin'])], assignMediator);
 
 /**
  * @swagger
@@ -262,7 +267,7 @@ router.put('/:id/mediator', [auth, roleAuth(['admin'])], assignMediator);
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/:id/close', [auth, roleAuth(['mediator', 'admin'])], closeCase);
+router.put('/:id/close', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], closeCase);
 
 /**
  * @swagger
@@ -347,7 +352,7 @@ router.get('/:id/meetings', auth, getCaseMeetings);
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/:id/meetings', [auth, roleAuth(['mediator', 'admin'])], createCaseMeeting);
+router.post('/:id/meetings', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], createCaseMeeting);
 
 /**
  * @swagger
@@ -393,7 +398,8 @@ router.post('/:id/meetings', [auth, roleAuth(['mediator', 'admin'])], createCase
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/:id/progress', [auth, roleAuth(['mediator', 'admin'])], addCaseProgress);
+router.get('/:id/progress', auth, getCaseProgress);
+router.post('/:id/progress', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], addCaseProgress);
 
 /**
  * @swagger
@@ -497,7 +503,7 @@ router.get('/:id/schedule', auth, getCaseSchedules);
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/:id/schedule', [auth, roleAuth(['mediator', 'admin'])], addCaseSchedule);
+router.post('/:id/schedule', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], addCaseSchedule);
 
 /**
  * @swagger
@@ -552,7 +558,7 @@ router.post('/:id/schedule', [auth, roleAuth(['mediator', 'admin'])], addCaseSch
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'admin'])], updateCaseSchedule);
+router.put('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], updateCaseSchedule);
 
 /**
  * @swagger
@@ -587,7 +593,7 @@ router.put('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'admin'])],
  *       500: 
  *         description: 服务器内部错误
  */
-router.delete('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'admin'])], deleteCaseSchedule);
+router.delete('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], deleteCaseSchedule);
 
 /**
  * @swagger
@@ -631,7 +637,7 @@ router.delete('/:id/schedule/:scheduleId', [auth, roleAuth(['mediator', 'admin']
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/:id/mediation-agreement', [auth, roleAuth(['mediator', 'admin'])], handleMediationAgreement);
+router.post('/:id/mediation-agreement', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], handleMediationAgreement);
 
 /**
  * @swagger
@@ -660,7 +666,7 @@ router.post('/:id/mediation-agreement', [auth, roleAuth(['mediator', 'admin'])],
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/:id/export', [auth, roleAuth(['mediator', 'admin'])], exportFile);
+router.get('/:id/export', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], exportFile);
 
 /**
  * @swagger
@@ -689,6 +695,6 @@ router.get('/:id/export', [auth, roleAuth(['mediator', 'admin'])], exportFile);
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/:id/ai-analysis', [auth, roleAuth(['mediator', 'admin'])], getAIAnalysis);
+router.get('/:id/ai-analysis', [auth, roleAuth(['mediator', 'tenant_admin', 'superadmin'])], getAIAnalysis);
 
 export default router;

@@ -68,6 +68,19 @@
   border-color: #1890ff;
 }
 
+.picker-display {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96rpx;
+  line-height: 96rpx;
+  padding: 0 28rpx;
+  background: #f5f7fa;
+  border: 2rpx solid transparent;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
 /* 角色选择卡片 */
 .role-tabs {
   display: flex;

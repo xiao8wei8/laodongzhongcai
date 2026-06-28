@@ -2,34 +2,185 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import pool from '../config/mysql';
 import { userRepository, visitorRecordRepository } from '../repositories';
+import analyticsEventRepository from '../repositories/analyticsEventRepository';
 import { auth } from '../middleware/auth';
 import wechatService, { webCodeToUser } from '../services/wechatService';
+import smsService from '../services/smsService';
 import wechatConfig from '../config/wechat';
+import { getRequestIp, writeOperationLog } from '../utils/audit';
 
 // 密码验证辅助函数
 const verifyPassword = async (enteredPassword: string, hashedPassword: string): Promise<boolean> => {
   return await bcrypt.compare(enteredPassword, hashedPassword);
 };
 
+const getRequestOrigin = (req?: express.Request) => {
+  if (!req) return '';
+  const forwardedProto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim();
+  const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = forwardedHost || req.get('host') || '';
+  return host ? `${protocol}://${host}` : '';
+};
+
+const normalizeAvatarUrl = (avatarUrl?: string | null, req?: express.Request) => {
+  const raw = String(avatarUrl || '').trim();
+  if (!raw) return '';
+
+  const uploadPathMatch = raw.match(/(\/laodongzhongcai\/uploads\/avatars\/[^?#]+)/);
+  const origin = getRequestOrigin(req);
+
+  if (uploadPathMatch && origin) {
+    return `${origin}${uploadPathMatch[1]}`;
+  }
+
+  if (raw.startsWith('/laodongzhongcai/uploads/avatars/') && origin) {
+    return `${origin}${raw}`;
+  }
+
+  return raw;
+};
+
+const buildUserInfo = (user: any, req?: express.Request) => ({
+  id: user.id,
+  username: user.username,
+  name: user.name,
+  nickname: user.nickname || '',
+  avatarUrl: normalizeAvatarUrl(user.avatarUrl || '', req),
+  position: user.position,
+  officePhone: user.officePhone,
+  phone: user.phone,
+  role: user.role,
+  isSuperAdmin: !!user.isSuperAdmin,
+  tenantId: user.tenantId || null,
+  tenantName: user.tenantName || null,
+  districtName: user.districtName || null,
+  streetName: user.streetName || null,
+  address: user.address,
+  idCard: user.idCard,
+  street: user.street,
+  department: user.department
+});
+
+const isSuperAdminRole = (role?: string) => role === 'superadmin';
+const isTenantAdminRole = (role?: string) => role === 'tenant_admin';
+const isBackofficeRole = (role?: string) => ['superadmin', 'tenant_admin', 'mediator'].includes(role || '');
+
+const getAssignableRoles = (currentUser?: Express.Request['user']) => {
+  if (!currentUser) return ['personal', 'company'];
+  if (isSuperAdminRole(currentUser.role)) return ['superadmin', 'tenant_admin', 'mediator', 'personal', 'company'];
+  if (isTenantAdminRole(currentUser.role)) return ['tenant_admin', 'mediator'];
+  return ['personal', 'company'];
+};
+
+const canManageTargetUser = (currentUser: Express.Request['user'] | undefined, targetUser: any) => {
+  if (!currentUser) return false;
+  if (isSuperAdminRole(currentUser.role)) return true;
+  if (!isTenantAdminRole(currentUser.role)) return false;
+  return !!currentUser.tenantId && currentUser.tenantId === targetUser.tenantId;
+};
+
+const getTenantById = async (tenantId?: string | null) => {
+  if (!tenantId) return null;
+  const [rows] = await pool.query(
+    `SELECT id, tenantName, districtName, streetName
+     FROM tenants
+     WHERE id = ? AND status = 'active'
+     LIMIT 1`,
+    [tenantId]
+  );
+  return (rows as any[])[0] || null;
+};
+
+const assertSingleTenantAdminLimit = async (tenantId?: string | null, excludeUserId?: string | null) => {
+  if (!tenantId) return;
+  const params: any[] = [tenantId];
+  let sql = `SELECT COUNT(*) AS count FROM users WHERE tenantId = ? AND role = 'tenant_admin'`;
+  if (excludeUserId) {
+    sql += ' AND id <> ?';
+    params.push(excludeUserId);
+  }
+  const [rows] = await pool.query(sql, params);
+  const count = Number((rows as any[])[0]?.count || 0);
+  if (count >= 1) {
+    throw new Error('当前街道已存在街道管理员，只允许保留 1 个');
+  }
+};
+
+const avatarDir = path.resolve(__dirname, '../../public/uploads/avatars');
+if (!fs.existsSync(avatarDir)) {
+  fs.mkdirSync(avatarDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, avatarDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '.png';
+    cb(null, `avatar_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`);
+  }
+});
+
+const avatarUpload = multer({ storage: avatarStorage });
+
+const phoneVerificationStore = new Map<string, {
+  userId: string;
+  phone: string;
+  code: string;
+  expireAt: number;
+}>();
+
+const generateSmsCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const isRealConfigValue = (value?: string) => !!value && !String(value).startsWith('your_');
+
 // 登录
 export const login = async (req: express.Request, res: express.Response) => {
-  const { username, password, role } = req.body;
+  const { username, password, role, tenantId } = req.body;
   
   console.log('登录请求:', { username, password, role });
   
   try {
-    // 查找用户 - 使用自定义查询
+    const roleFilters = role === 'admin'
+      ? ['superadmin', 'tenant_admin']
+      : [role];
+    const placeholders = roleFilters.map(() => '?').join(', ');
     const [rows] = await pool.query(
-      'SELECT * FROM users WHERE username = ? AND role = ?',
-      [username, role]
+      `SELECT u.*, t.tenantName, t.districtName, t.streetName
+       FROM users u
+       LEFT JOIN tenants t ON u.tenantId = t.id
+       WHERE u.username = ? AND u.role IN (${placeholders})`,
+      [username, ...roleFilters]
     );
     const users = rows as any[];
-    const user = users[0];
+    let user = users[0];
     
     if (!user) {
       console.log('用户不存在:', { username, role });
+      await analyticsEventRepository.trackEvent('login_failed', {
+        event: 'login_failed',
+        username,
+        role,
+        clientType: 'pc_admin',
+        ip: getRequestIp(req),
+        userAgent: req.headers['user-agent'] || '',
+        page: '/login',
+        timestamp: Date.now()
+      });
+      await writeOperationLog({
+        req,
+        username,
+        role,
+        module: 'auth',
+        action: 'login',
+        targetType: 'user',
+        targetDisplay: username,
+        result: 'failed',
+        errorMessage: '用户名不存在'
+      });
       return res.status(401).json({ message: '用户名或密码错误' });
     }
     
@@ -41,35 +192,97 @@ export const login = async (req: express.Request, res: express.Response) => {
     
     if (!isMatch) {
       console.log('密码错误');
+      await analyticsEventRepository.trackEvent('login_failed', {
+        event: 'login_failed',
+        username: user.username,
+        role: user.role,
+        tenantId: user.tenantId || null,
+        clientType: 'pc_admin',
+        ip: getRequestIp(req),
+        userAgent: req.headers['user-agent'] || '',
+        page: '/login',
+        timestamp: Date.now()
+      }, user.id);
+      await writeOperationLog({
+        req,
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        tenantId: user.tenantId || null,
+        module: 'auth',
+        action: 'login',
+        targetType: 'user',
+        targetId: user.id,
+        targetDisplay: user.username,
+        result: 'failed',
+        errorMessage: '密码错误'
+      });
       return res.status(401).json({ message: '用户名或密码错误' });
     }
     
     console.log('密码验证成功');
+
+    if (['personal', 'company'].includes(user.role)) {
+      if (!tenantId) {
+        return res.status(400).json({ message: '登录时请选择所属街道' });
+      }
+      const tenant = await getTenantById(tenantId);
+      if (!tenant) {
+        return res.status(400).json({ message: '所选街道不存在或已停用' });
+      }
+      if (user.tenantId !== tenant.id || user.street !== tenant.tenantName) {
+        await pool.query(
+          'UPDATE users SET tenantId = ?, street = ? WHERE id = ?',
+          [tenant.id, tenant.tenantName, user.id]
+        );
+        const [updatedRows] = await pool.query(
+          `SELECT u.*, t.tenantName, t.districtName, t.streetName
+           FROM users u
+           LEFT JOIN tenants t ON u.tenantId = t.id
+           WHERE u.id = ?
+           LIMIT 1`,
+          [user.id]
+        );
+        user = (updatedRows as any[])[0];
+      }
+    }
     
     // 生成JWT令牌
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { id: user.id, username: user.username, role: user.role, isSuperAdmin: !!user.isSuperAdmin, tenantId: user.tenantId || null },
       process.env.JWT_SECRET || 'your_jwt_secret_key',
       { expiresIn: 86400 } // 24小时，使用数字格式避免类型错误
     );
     
     // 返回用户信息和令牌
-    const userInfo = {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      position: user.position,
-      officePhone: user.officePhone,
-      phone: user.phone,
-      email: user.email,
-      role: user.role,
-      address: user.address,
-      idCard: user.idCard,
-      street: user.street,
-      department: user.department
-    };
+    const userInfo = buildUserInfo(user, req);
     
     console.log('登录成功，返回用户信息和令牌');
+    await analyticsEventRepository.trackEvent('login_success', {
+      event: 'login_success',
+      username: user.username,
+      role: user.role,
+      tenantId: user.tenantId || null,
+      clientType: 'pc_admin',
+      ip: getRequestIp(req),
+      userAgent: req.headers['user-agent'] || '',
+      page: '/login',
+      timestamp: Date.now()
+    }, user.id);
+    await writeOperationLog({
+      req,
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      tenantId: user.tenantId || null,
+      module: 'auth',
+      action: 'login',
+      targetType: 'user',
+      targetId: user.id,
+      targetDisplay: user.username,
+      result: 'success',
+      detail: '用户登录成功'
+    });
     res.json({
       token,
       userInfo
@@ -82,9 +295,21 @@ export const login = async (req: express.Request, res: express.Response) => {
 
 // 注册
 export const register = async (req: express.Request, res: express.Response) => {
-  const { username, password, name, position, officePhone, phone, email, role, address, idCard, identity, caseAmount, street, department } = req.body;
+  const { username, password, name, position, officePhone, phone, role, address, idCard, identity, caseAmount, street, department, tenantId } = req.body;
   
   try {
+    if (!['personal', 'company'].includes(role)) {
+      return res.status(403).json({ message: '公开注册仅支持个人用户和企业用户' });
+    }
+    if (!tenantId) {
+      return res.status(400).json({ message: '请选择所属街道' });
+    }
+
+    const tenant = await getTenantById(tenantId);
+    if (!tenant) {
+      return res.status(400).json({ message: '所选街道不存在或已停用' });
+    }
+
     // 检查用户名是否已存在
     const existingUser = await userRepository.findByUsername(username);
     
@@ -92,23 +317,7 @@ export const register = async (req: express.Request, res: express.Response) => {
       return res.status(400).json({ message: '用户名已存在' });
     }
     
-    // 检查邮箱是否已存在（如果提供了邮箱）
-    if (email) {
-      const [emailRows] = await pool.query(
-        'SELECT * FROM users WHERE email = ?',
-        [email]
-      );
-      if ((emailRows as any[]).length > 0) {
-        return res.status(400).json({ message: '邮箱已被使用' });
-      }
-    }
-    
-    // 处理邮箱字段，确保唯一性
-    let userEmail = email;
-    if (!email || email.trim() === '') {
-      // 为没有提供邮箱的用户生成唯一邮箱，避免唯一索引冲突
-      userEmail = `${username}_${Date.now()}@example.com`;
-    }
+    const userEmail = `${username}_${Date.now()}@example.com`;
     
     // 加密密码
     const salt = await bcrypt.genSalt(10);
@@ -128,8 +337,9 @@ export const register = async (req: express.Request, res: express.Response) => {
       idCard,
       identity,
       caseAmount,
-      street,
-      department
+      street: tenant.tenantName,
+      department,
+      tenantId: tenant.id
     };
     
     // 创建新用户
@@ -144,6 +354,72 @@ export const register = async (req: express.Request, res: express.Response) => {
   }
 };
 
+export const createManagedUser = async (req: express.Request, res: express.Response) => {
+  const { username, password, name, position, officePhone, phone, role, address, idCard, identity, caseAmount, street, department, tenantId } = req.body;
+
+  try {
+    const allowedRoles = getAssignableRoles(req.user);
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({ message: '当前账号无权创建该角色' });
+    }
+
+    const existingUser = await userRepository.findByUsername(username);
+    if (existingUser) {
+      return res.status(400).json({ message: '用户名已存在' });
+    }
+
+    let resolvedTenantId = tenantId || null;
+    let resolvedStreet = street || '';
+    if (isTenantAdminRole(req.user?.role)) {
+      resolvedTenantId = req.user?.tenantId || null;
+      resolvedStreet = req.user?.tenantName || street || '';
+    }
+    const selectedTenant = resolvedTenantId ? await getTenantById(resolvedTenantId) : null;
+    if (resolvedTenantId && !selectedTenant) {
+      return res.status(400).json({ message: '所选街道不存在或已停用' });
+    }
+    if (selectedTenant) {
+      resolvedStreet = selectedTenant.tenantName;
+    }
+
+    if ((role === 'tenant_admin' || role === 'mediator') && !resolvedTenantId) {
+      return res.status(400).json({ message: '该角色必须绑定街道租户' });
+    }
+    if (role === 'tenant_admin') {
+      await assertSingleTenantAdminLimit(resolvedTenantId);
+    }
+
+    const userEmail = `${username}_${Date.now()}@example.com`;
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await userRepository.create({
+      username,
+      password: hashedPassword,
+      name,
+      position,
+      officePhone,
+      phone,
+      email: userEmail,
+      role,
+      address,
+      idCard,
+      identity,
+      caseAmount,
+      street: resolvedStreet,
+      department,
+      tenantId: resolvedTenantId,
+      isSuperAdmin: role === 'superadmin'
+    } as any);
+
+    res.status(201).json({ message: '用户创建成功', userId: user.id });
+  } catch (error) {
+    console.error('后台创建用户错误:', error);
+    const message = error instanceof Error ? error.message : '服务器内部错误';
+    res.status(message.includes('只允许保留 1 个') ? 400 : 500).json({ message });
+  }
+};
+
 // 获取当前用户信息
 export const getMe = [auth, async (req: express.Request, res: express.Response) => {
   try {
@@ -153,12 +429,225 @@ export const getMe = [auth, async (req: express.Request, res: express.Response) 
       return res.status(404).json({ message: '用户不存在' });
     }
     
-    // 移除密码字段
-    const { password, ...userInfo } = user;
-    
-    res.json({ userInfo });
+    res.json({
+      userInfo: buildUserInfo({
+        ...user,
+        tenantId: req.user?.tenantId || (user as any).tenantId || null,
+        tenantName: req.user?.tenantName || null,
+        districtName: req.user?.districtName || null,
+        streetName: req.user?.streetName || null
+      }, req)
+    });
   } catch (error) {
     console.error('获取用户信息错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+}];
+
+// 更新当前用户资料
+export const updateProfile = [auth, async (req: express.Request, res: express.Response) => {
+  try {
+    const currentUser = await userRepository.findById(req.user!.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+
+    const { name, nickname, avatarUrl, phone, tenantId } = req.body;
+    let nextTenantId = (currentUser as any).tenantId || null;
+    let nextStreet = currentUser.street || null;
+    let nextTenantInfo: any = req.user?.tenantId ? {
+      tenantName: req.user?.tenantName || null,
+      districtName: req.user?.districtName || null,
+      streetName: req.user?.streetName || null
+    } : null;
+
+    if (tenantId !== undefined) {
+      const tenant = await getTenantById(tenantId);
+      if (!tenant) {
+        return res.status(400).json({ message: '所选街道不存在或已停用' });
+      }
+      nextTenantId = tenant.id;
+      nextStreet = tenant.tenantName;
+      nextTenantInfo = tenant;
+    }
+
+    const updatedUser = await userRepository.update(req.user!.id, {
+      name: name ?? currentUser.name,
+      nickname: nickname ?? (currentUser as any).nickname ?? null,
+      avatarUrl: avatarUrl ?? (currentUser as any).avatarUrl ?? null,
+      phone: phone ?? currentUser.phone ?? null,
+      tenantId: nextTenantId,
+      street: nextStreet
+    } as any);
+
+    res.json({
+      message: '资料更新成功',
+      userInfo: buildUserInfo({
+        ...updatedUser,
+        tenantId: nextTenantId,
+        tenantName: nextTenantInfo?.tenantName || null,
+        districtName: nextTenantInfo?.districtName || null,
+        streetName: nextTenantInfo?.streetName || null
+      }, req)
+    });
+  } catch (error) {
+    console.error('更新当前用户资料错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+}];
+
+// 上传当前用户头像
+export const uploadAvatar = [
+  auth,
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    avatarUpload.single('avatar')(req, res, (err: any) => {
+      if (err) return res.status(400).json({ message: '头像上传失败' });
+      next();
+    });
+  },
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ message: '缺少头像文件' });
+      }
+
+      const avatarUrl = `${getRequestOrigin(req)}/laodongzhongcai/uploads/avatars/${file.filename}`;
+      const updatedUser = await userRepository.update(req.user!.id, { avatarUrl } as any);
+
+      res.json({
+        message: '头像上传成功',
+        avatarUrl: normalizeAvatarUrl(avatarUrl, req),
+        userInfo: buildUserInfo(updatedUser, req)
+      });
+    } catch (error) {
+      console.error('上传头像错误:', error);
+      res.status(500).json({ message: '服务器内部错误' });
+    }
+  }
+];
+
+// 通过微信授权绑定手机号
+export const bindWechatPhone = [auth, async (req: express.Request, res: express.Response) => {
+  const { code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ message: '缺少手机号授权 code' });
+  }
+
+  try {
+    const phone = await wechatService.getUserPhoneNumber(code);
+    const updatedUser = await userRepository.update(req.user!.id, { phone } as any);
+
+    res.json({
+      message: '手机号绑定成功',
+      phone,
+      userInfo: buildUserInfo(updatedUser, req)
+    });
+  } catch (error: any) {
+    console.error('[wechat] 获取手机号失败:', error);
+    res.status(400).json({ message: error?.message || '获取手机号失败' });
+  }
+}];
+
+// 发送短信验证码（用于登录后可选绑定手机号）
+export const sendSmsCode = [auth, async (req: express.Request, res: express.Response) => {
+  const { phone } = req.body;
+  const normalizedPhone = String(phone || '').trim();
+
+  if (!/^1[3-9]\d{9}$/.test(normalizedPhone)) {
+    return res.status(400).json({ message: '请输入正确的手机号' });
+  }
+
+  try {
+    const existingUser = await userRepository.findByPhone(normalizedPhone);
+    if (existingUser && existingUser.id !== req.user!.id) {
+      return res.status(400).json({ message: '该手机号已被其他账号绑定' });
+    }
+
+    const code = generateSmsCode();
+    phoneVerificationStore.set(`${req.user!.id}:${normalizedPhone}`, {
+      userId: req.user!.id,
+      phone: normalizedPhone,
+      code,
+      expireAt: Date.now() + 5 * 60 * 1000
+    });
+
+    const isSmsConfigured = (
+      isRealConfigValue(process.env.SMS_SDK_APP_ID) &&
+      isRealConfigValue(process.env.TENCENT_CLOUD_SECRET_ID || process.env.SMS_SECRET_ID) &&
+      isRealConfigValue(process.env.TENCENT_CLOUD_SECRET_KEY || process.env.SMS_SECRET_KEY) &&
+      isRealConfigValue(process.env.SMS_TEMPLATE_VERIFICATION || process.env.SMS_TEMPLATE_ID_VERIFICATION)
+    );
+
+    if (process.env.NODE_ENV === 'development' || !isSmsConfigured) {
+      console.log(`[auth] 开发环境短信验证码 ${normalizedPhone}: ${code}`);
+      return res.json({
+        success: true,
+        message: '验证码已发送',
+        debugCode: code,
+        simulated: true,
+        expireInSeconds: 300
+      });
+    }
+
+    const success = await smsService.sendVerificationCode(normalizedPhone, code);
+    if (!success) {
+      phoneVerificationStore.delete(`${req.user!.id}:${normalizedPhone}`);
+      return res.status(500).json({ message: '短信发送失败，请稍后再试' });
+    }
+
+    res.json({ success: true, message: '验证码已发送', expireInSeconds: 300 });
+  } catch (error) {
+    console.error('发送短信验证码错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+}];
+
+// 校验短信验证码并绑定手机号
+export const bindPhoneBySms = [auth, async (req: express.Request, res: express.Response) => {
+  const { phone, code } = req.body;
+  const normalizedPhone = String(phone || '').trim();
+  const normalizedCode = String(code || '').trim();
+
+  if (!/^1[3-9]\d{9}$/.test(normalizedPhone)) {
+    return res.status(400).json({ message: '请输入正确的手机号' });
+  }
+
+  if (!/^\d{6}$/.test(normalizedCode)) {
+    return res.status(400).json({ message: '请输入6位验证码' });
+  }
+
+  try {
+    const existingUser = await userRepository.findByPhone(normalizedPhone);
+    if (existingUser && existingUser.id !== req.user!.id) {
+      return res.status(400).json({ message: '该手机号已被其他账号绑定' });
+    }
+
+    const verification = phoneVerificationStore.get(`${req.user!.id}:${normalizedPhone}`);
+    if (!verification) {
+      return res.status(400).json({ message: '请先获取验证码' });
+    }
+
+    if (verification.expireAt < Date.now()) {
+      phoneVerificationStore.delete(`${req.user!.id}:${normalizedPhone}`);
+      return res.status(400).json({ message: '验证码已过期，请重新获取' });
+    }
+
+    if (verification.code !== normalizedCode) {
+      return res.status(400).json({ message: '验证码错误' });
+    }
+
+    phoneVerificationStore.delete(`${req.user!.id}:${normalizedPhone}`);
+    const updatedUser = await userRepository.update(req.user!.id, { phone: normalizedPhone } as any);
+
+    res.json({
+      success: true,
+      message: '手机号绑定成功',
+      userInfo: buildUserInfo(updatedUser, req)
+    });
+  } catch (error) {
+    console.error('短信绑定手机号错误:', error);
     res.status(500).json({ message: '服务器内部错误' });
   }
 }];
@@ -168,7 +657,13 @@ export const refreshToken = [auth, async (req: express.Request, res: express.Res
   try {
     // 生成新的JWT令牌
     const token = jwt.sign(
-      { id: req.user?.id, username: req.user?.username, role: req.user?.role },
+      {
+        id: req.user?.id,
+        username: req.user?.username,
+        role: req.user?.role,
+        isSuperAdmin: !!req.user?.isSuperAdmin,
+        tenantId: req.user?.tenantId || null
+      },
       process.env.JWT_SECRET || 'your_jwt_secret_key',
       { expiresIn: 86400 } // 24小时，使用数字格式避免类型错误
     );
@@ -183,10 +678,15 @@ export const refreshToken = [auth, async (req: express.Request, res: express.Res
 // 获取用户列表（仅管理员）
 export const getUsers = async (req: express.Request, res: express.Response) => {
   try {
-    const { role, search, street, department } = req.query;
+    const { role, search, street, department, tenantId } = req.query;
     
     let whereClause = '1=1';
     const params: any[] = [];
+
+    if (isTenantAdminRole(req.user?.role)) {
+      whereClause += ' AND tenantId = ?';
+      params.push(req.user?.tenantId || '');
+    }
     
     if (role) {
       whereClause += ' AND role = ?';
@@ -202,14 +702,25 @@ export const getUsers = async (req: express.Request, res: express.Response) => {
       whereClause += ' AND department = ?';
       params.push(department);
     }
+    if (tenantId) {
+      whereClause += ' AND tenantId = ?';
+      params.push(tenantId);
+    }
     
     if (search) {
-      whereClause += ' AND (name LIKE ? OR phone LIKE ? OR email LIKE ? OR username LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      whereClause += ' AND (name LIKE ? OR phone LIKE ? OR username LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     
     const [rows] = await pool.query(
-      `SELECT id, username, name, position, officePhone, phone, email, role, address, idCard, street, department, identity, caseAmount, isOnDuty, lastOnDutyDate, createdAt, updatedAt FROM users WHERE ${whereClause}`,
+      `SELECT
+         u.id, u.username, u.name, u.position, u.officePhone, u.phone, u.role,
+         u.address, u.idCard, u.street, u.department, u.identity, u.caseAmount,
+         u.isOnDuty, u.lastOnDutyDate, u.createdAt, u.updatedAt, u.tenantId, u.isSuperAdmin,
+         t.tenantName, t.districtName, t.streetName
+       FROM users u
+       LEFT JOIN tenants t ON u.tenantId = t.id
+       WHERE ${whereClause.replace(/\brole\b/g, 'u.role').replace(/\bstreet\b/g, 'u.street').replace(/\bdepartment\b/g, 'u.department').replace(/\bname\b/g, 'u.name').replace(/\bphone\b/g, 'u.phone').replace(/\busername\b/g, 'u.username').replace(/\btenantId\b/g, 'u.tenantId')}`,
       params
     );
     
@@ -223,13 +734,34 @@ export const getUsers = async (req: express.Request, res: express.Response) => {
 // 更新用户信息（仅管理员）
 export const updateUser = async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { name, position, officePhone, phone, email, role, address, idCard, street, department } = req.body;
+  const { name, position, officePhone, phone, role, address, idCard, street, department, tenantId } = req.body;
   
   try {
     const user = await userRepository.findById(id);
     
     if (!user) {
       return res.status(404).json({ message: '用户不存在' });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({ message: '无权操作该用户' });
+    }
+
+    if (role) {
+      const allowedRoles = getAssignableRoles(req.user);
+      if (!allowedRoles.includes(role)) {
+        return res.status(403).json({ message: '当前账号无权设置该角色' });
+      }
+    }
+
+    const resolvedTenantId = isTenantAdminRole(req.user?.role)
+      ? (req.user?.tenantId || null)
+      : (tenantId !== undefined ? tenantId : (user as any).tenantId || null);
+    const resolvedStreet = isTenantAdminRole(req.user?.role)
+      ? (req.user?.tenantName || street || user.street)
+      : (street || user.street);
+    if ((role || user.role) === 'tenant_admin') {
+      await assertSingleTenantAdminLimit(resolvedTenantId, id);
     }
     
     // 更新用户信息
@@ -238,18 +770,20 @@ export const updateUser = async (req: express.Request, res: express.Response) =>
       position: position || user.position,
       officePhone: officePhone || user.officePhone,
       phone: phone || user.phone,
-      email: email || user.email,
       role: role || user.role,
       address: address || user.address,
       idCard: idCard || user.idCard,
-      street: street || user.street,
-      department: department || user.department
+      street: resolvedStreet,
+      department: department || user.department,
+      tenantId: resolvedTenantId,
+      isSuperAdmin: (role || user.role) === 'superadmin'
     });
     
     res.json({ message: '用户更新成功', user: updatedUser });
   } catch (error) {
     console.error('更新用户错误:', error);
-    res.status(500).json({ message: '服务器内部错误' });
+    const message = error instanceof Error ? error.message : '服务器内部错误';
+    res.status(message.includes('只允许保留 1 个') ? 400 : 500).json({ message });
   }
 };
 
@@ -262,6 +796,13 @@ export const deleteUser = async (req: express.Request, res: express.Response) =>
     
     if (!user) {
       return res.status(404).json({ message: '用户不存在' });
+    }
+
+    if (!canManageTargetUser(req.user, user)) {
+      return res.status(403).json({ message: '无权删除该用户' });
+    }
+    if ((user as any).role === 'superadmin' && !isSuperAdminRole(req.user?.role)) {
+      return res.status(403).json({ message: '无权删除超级管理员' });
     }
     
     await userRepository.delete(id);
@@ -319,28 +860,37 @@ export const verifyRegisterToken = async (req: express.Request, res: express.Res
 // 流程：wx.login() → code → 调用 jscode2session → openid → 登录/注册
 // ============================================================
 export const wechatLogin = async (req: express.Request, res: express.Response) => {
-  const { code } = req.body;
+  const { code, tenantId } = req.body;
 
   if (!code) {
     return res.status(400).json({ message: '缺少微信登录 code' });
   }
+  if (!tenantId) {
+    return res.status(400).json({ message: '登录时请选择所属街道' });
+  }
 
   try {
+    const tenant = await getTenantById(tenantId);
+    if (!tenant) {
+      return res.status(400).json({ message: '所选街道不存在或已停用' });
+    }
+
     // 1) 调用微信官方接口：code → openid
-    //    若未配置凭证，使用"简化模式"（测试/演示环境可用），方便本地联调
+    //    这里要求真实登录：code 必须成功换取 openid，不再默认降级为 mock 用户。
     let openid: string;
     try {
       const session = await wechatService.jscode2session(code);
       openid = session.openid;
     } catch (e: any) {
-      // 未配置 / 网络不通时，降级为简化模式（把 code 当作 openid）
-      console.warn('[wechat] jscode2session 失败，降级为简化模式:', e?.message);
-      openid = `wx_${code}`;
+      console.error('[wechat] jscode2session 失败:', e?.message);
+      return res.status(401).json({
+        message: '微信登录失败，请确认小程序 AppID/AppSecret 配置一致，并重新获取登录态'
+      });
     }
 
-    // 2) 以 openid 查找现有用户
-    let [rows] = await pool.query(
-      'SELECT * FROM users WHERE wechat_mp_openid = ? OR username = ?',
+    // 2) 以 openid / 用户名查找现有用户
+    const [rows] = await pool.query(
+      'SELECT * FROM users WHERE wechat_mp_openid = ? OR username = ? LIMIT 1',
       [openid, openid]
     );
     let user = (rows as any[])[0];
@@ -352,18 +902,51 @@ export const wechatLogin = async (req: express.Request, res: express.Response) =
       const defaultRole = 'personal';
 
       await pool.query(
-        'INSERT INTO users (id, username, name, password, role, phone, email, wechat_mp_openid, address, idCard, street, department, identity, position, officePhone, caseAmount, isOnDuty, lastOnDutyDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO users (id, username, name, password, role, phone, email, wechat_mp_openid, address, idCard, street, tenantId, department, identity, position, officePhone, caseAmount, isOnDuty, lastOnDutyDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           newUserId, openid, '微信用户', hashedPassword, defaultRole,
-          '', '', openid, '', '', '', '', '', '', 0, 0, null, new Date(), new Date()
+          '', '', openid, null, null, tenant.tenantName, tenant.id, null, null, null, null, 0, 0, null, new Date(), new Date()
         ]
       );
 
-      const [newRows] = await pool.query('SELECT * FROM users WHERE id = ?', [newUserId]);
+      const [newRows] = await pool.query(
+        `SELECT u.*, t.tenantName, t.districtName, t.streetName
+         FROM users u
+         LEFT JOIN tenants t ON u.tenantId = t.id
+         WHERE u.id = ?`,
+        [newUserId]
+      );
       user = (newRows as any[])[0];
-    } else if (!user.wechat_mp_openid) {
-      // 已有用户但尚未绑定小程序 openid → 补录
-      await pool.query('UPDATE users SET wechat_mp_openid = ? WHERE id = ?', [openid, user.id]);
+    } else {
+      // 已有用户：补录 openid / 手机号
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (!user.wechat_mp_openid) {
+        updates.push('wechat_mp_openid = ?');
+        params.push(openid);
+      }
+      if (user.tenantId !== tenant.id) {
+        updates.push('tenantId = ?');
+        params.push(tenant.id);
+      }
+      if (user.street !== tenant.tenantName) {
+        updates.push('street = ?');
+        params.push(tenant.tenantName);
+      }
+
+      if (updates.length > 0) {
+        params.push(user.id);
+        await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+        const [updatedRows] = await pool.query(
+          `SELECT u.*, t.tenantName, t.districtName, t.streetName
+           FROM users u
+           LEFT JOIN tenants t ON u.tenantId = t.id
+           WHERE u.id = ?`,
+          [user.id]
+        );
+        user = (updatedRows as any[])[0];
+      }
     }
 
     if (!user) {
@@ -372,7 +955,7 @@ export const wechatLogin = async (req: express.Request, res: express.Response) =
 
     // 4) 生成 JWT
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, name: user.name, phone: user.phone, email: user.email },
+      { id: user.id, username: user.username, role: user.role, isSuperAdmin: !!user.isSuperAdmin, name: user.name, phone: user.phone, tenantId: user.tenantId || null },
       process.env.JWT_SECRET || 'your_jwt_secret_key',
       { expiresIn: 86400 }
     );
@@ -380,9 +963,10 @@ export const wechatLogin = async (req: express.Request, res: express.Response) =
     res.json({
       token,
       userInfo: {
-        id: user.id, username: user.username, name: user.name || '微信用户',
-        role: user.role, phone: user.phone, email: user.email,
-        position: user.position, address: user.address, idCard: user.idCard,
+        ...buildUserInfo({
+          ...user,
+          name: user.name || '微信用户'
+        }, req)
       },
       message: '微信登录成功',
     });
@@ -463,7 +1047,7 @@ export const wechatWebCallback = async (req: express.Request, res: express.Respo
 
     // 4) 生成 JWT
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, name: user.name, phone: user.phone, email: user.email },
+      { id: user.id, username: user.username, role: user.role, isSuperAdmin: !!user.isSuperAdmin, name: user.name, phone: user.phone },
       process.env.JWT_SECRET || 'your_jwt_secret_key',
       { expiresIn: 86400 }
     );

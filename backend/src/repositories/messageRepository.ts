@@ -68,6 +68,75 @@ class MessageRepository extends BaseRepository<Message> {
     };
   }
 
+  async findCaseMessagesForUser(caseId: string, userId: string, page: number = 1, limit: number = 50): Promise<{ messages: MessageWithRelations[], total: number }> {
+    const offset = (page - 1) * limit;
+    const params = [caseId, userId, userId];
+
+    const [rows] = await pool.query(
+      `SELECT m.*,
+              s.name as senderName,
+              r.name as receiverName,
+              c.caseNumber
+       FROM ${this.tableName} m
+       LEFT JOIN users s ON m.senderId = s.id
+       LEFT JOIN users r ON m.receiverId = r.id
+       LEFT JOIN cases c ON m.caseId = c.id
+       WHERE m.caseId = ?
+         AND COALESCE(m.type, 'case_message') = 'case_message'
+         AND (m.senderId = ? OR m.receiverId = ?)
+       ORDER BY m.createdAt ASC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM ${this.tableName} m
+       WHERE m.caseId = ?
+         AND COALESCE(m.type, 'case_message') = 'case_message'
+         AND (m.senderId = ? OR m.receiverId = ?)`,
+      params
+    );
+
+    return {
+      messages: rows as MessageWithRelations[],
+      total: (countResult as any)[0].total
+    };
+  }
+
+  async findCaseMessages(caseId: string, page: number = 1, limit: number = 50): Promise<{ messages: MessageWithRelations[], total: number }> {
+    const offset = (page - 1) * limit;
+
+    const [rows] = await pool.query(
+      `SELECT m.*,
+              s.name as senderName,
+              r.name as receiverName,
+              c.caseNumber
+       FROM ${this.tableName} m
+       LEFT JOIN users s ON m.senderId = s.id
+       LEFT JOIN users r ON m.receiverId = r.id
+       LEFT JOIN cases c ON m.caseId = c.id
+       WHERE m.caseId = ?
+         AND COALESCE(m.type, 'case_message') = 'case_message'
+       ORDER BY m.createdAt ASC
+       LIMIT ? OFFSET ?`,
+      [caseId, limit, offset]
+    );
+
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM ${this.tableName} m
+       WHERE m.caseId = ?
+         AND COALESCE(m.type, 'case_message') = 'case_message'`,
+      [caseId]
+    );
+
+    return {
+      messages: rows as MessageWithRelations[],
+      total: (countResult as any)[0].total
+    };
+  }
+
   async findUnreadMessages(receiverId: string): Promise<Message[]> {
     const [rows] = await pool.query(
       `SELECT * FROM ${this.tableName} WHERE receiverId = ? AND isRead = false ORDER BY createdAt DESC`,

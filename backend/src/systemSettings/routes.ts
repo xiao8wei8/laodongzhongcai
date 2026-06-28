@@ -41,10 +41,10 @@ const router = express.Router();
  *         description: 服务器内部错误
  */
 // 说明：
-// - 全局布局（Header）需要读取系统名称/图标，因此 GET 允许所有已登录用户访问；
-// - 但敏感字段（如 apiKeys）会在 controller 中对非管理员做脱敏/裁剪；
+// - 首页与游客浏览模式需要读取系统名称、首页横幅等公开配置，因此 GET 允许匿名访问；
+// - 敏感字段（如 apiKeys）会在 controller 中对非管理员做脱敏/裁剪；
 // - PUT 仍仅管理员可用。
-router.get('/', [auth], getSystemSettings);
+router.get('/', getSystemSettings);
 
 /**
  * @swagger
@@ -86,6 +86,6 @@ router.get('/', [auth], getSystemSettings);
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/', [auth, roleAuth(['admin'])], updateSystemSettings);
+router.put('/', [auth, roleAuth(['superadmin'])], updateSystemSettings);
 
 export default router;

@@ -1,9 +1,57 @@
 <view class="profile-container">
+  <view wx:if="{{isGuestMode}}" class="empty-state">
+    <view class="empty-state-icon">🔐</view>
+    <view class="empty-state-text">登录后可查看你的资料与服务记录</view>
+    <button class="btn-outline btn-sm mt-20" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
   <view class="profile-header">
-    <view class="avatar">{{firstChar}}</view>
+    <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{userInfo.avatarUrl}}" class="avatar avatar-image" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="avatar">{{firstChar}}</view>
+    </button>
     <view class="profile-info">
-      <view class="profile-name">{{userInfo.name || userInfo.username || '用户'}}</view>
+      <view class="profile-name">{{displayName || '用户'}}</view>
       <view class="profile-role text-sm">{{roleText}}</view>
+      <view class="profile-phone" wx:if="{{userInfo.phone}}">手机号：{{userInfo.phone}}</view>
+      <button wx:else class="bind-phone-btn" bindtap="openPhoneBindPanel">绑定手机号</button>
+      <view class="profile-phone" wx:if="{{userInfo.tenantName}}">所属街道：{{userInfo.tenantName}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{showNicknamePanel}}" class="phone-bind-panel card">
+    <view class="phone-bind-title">确认昵称</view>
+    <input class="phone-bind-input" type="nickname" maxlength="20" placeholder="请输入昵称" value="{{nicknameInput}}" bindinput="onNicknameInput" />
+    <view class="phone-bind-actions">
+      <button class="phone-bind-cancel" bindtap="closeNicknamePanel">取消</button>
+      <button class="phone-bind-confirm" bindtap="saveNickname">保存昵称</button>
+    </view>
+  </view>
+
+  <view wx:if="{{showPhoneBindPanel}}" class="phone-bind-panel card">
+    <view class="phone-bind-title">绑定手机号</view>
+    <input class="phone-bind-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{bindPhone}}" bindinput="onBindPhoneInput" />
+    <view class="phone-bind-row">
+      <input class="phone-bind-input phone-bind-code" type="number" maxlength="6" placeholder="请输入验证码" value="{{smsCode}}" bindinput="onSmsCodeInput" />
+      <button class="phone-send-btn" bindtap="sendSmsCode" disabled="{{smsCountdown > 0}}">
+        {{smsCountdown > 0 ? smsCountdown + 's后重发' : '获取验证码'}}
+      </button>
+    </view>
+    <view class="phone-bind-actions">
+      <button class="phone-bind-cancel" bindtap="closePhoneBindPanel">取消</button>
+      <button class="phone-bind-confirm" bindtap="bindPhoneBySms">确认绑定</button>
+    </view>
+  </view>
+
+  <view wx:if="{{showTenantPanel}}" class="phone-bind-panel card">
+    <view class="phone-bind-title">修改所属街道</view>
+    <picker range="{{tenants}}" range-key="tenantName" value="{{tenantIndex}}" bindchange="onTenantChange">
+      <view class="phone-bind-picker">{{tenantLabel}}</view>
+    </picker>
+    <view class="phone-bind-actions">
+      <button class="phone-bind-cancel" bindtap="closeTenantPanel">取消</button>
+      <button class="phone-bind-confirm" bindtap="saveTenant">保存街道</button>
     </view>
   </view>
 
@@ -38,19 +86,22 @@
       <text class="menu-text">消息通知</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="goFeedback">
+      <text class="menu-icon">📝</text>
+      <text class="menu-text">意见反馈</text>
+      <text class="menu-arrow">›</text>
+    </view>
+    <view class="menu-item" bindtap="openTenantPanel">
+      <text class="menu-icon">🏙️</text>
+      <view class="menu-text-wrap">
+        <text class="menu-text">所属街道</text>
+        <text class="menu-subtext">{{userInfo.tenantName || '未设置'}}</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <view class="card menu-card">
-    <view class="menu-item" bindtap="editProfile">
-      <text class="menu-icon">👤</text>
-      <text class="menu-text">个人信息</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="changePassword">
-      <text class="menu-icon">🔒</text>
-      <text class="menu-text">修改密码</text>
-      <text class="menu-arrow">›</text>
-    </view>
     <view class="menu-item" bindtap="showAbout">
       <text class="menu-icon">ℹ️</text>
       <text class="menu-text">关于我们</text>
@@ -59,4 +110,5 @@
   </view>
 
   <button class="logout-btn" bindtap="logout">退出登录</button>
+  </block>
 </view>

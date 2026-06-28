@@ -2,6 +2,8 @@ import axios from 'axios';
 import type { AxiosRequestConfig } from 'axios';
 import useAuthStore from '../store/authStore';
 
+export const AUTH_REDIRECT_KEY = 'post-login-redirect';
+
 // 扩展AxiosRequestConfig接口，添加metadata属性
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -152,10 +154,13 @@ api.interceptors.response.use(
 
     if (error.response && error.response.status === 401) {
       const { logout } = useAuthStore.getState();
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+        try {
+          window.sessionStorage.setItem(AUTH_REDIRECT_KEY, currentPath);
+        } catch (_error) {}
+      }
       logout();
-      // 考虑 basename 路径
-      const basename = '/laodongzhongcai';
-      window.location.href = `${basename}/login`;
     }
     return Promise.reject(error);
   }

@@ -7,7 +7,7 @@
 
 import express from 'express';
 import controller from './controller';
-import { auth as authMiddleware } from '../middleware/auth';
+import { auth as authMiddleware, roleAuth } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -42,7 +42,7 @@ const router = express.Router();
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/export-schema', authMiddleware, controller.exportSchema);
+router.get('/export-schema', [authMiddleware, roleAuth(['superadmin'])], controller.exportSchema);
 
 /**
  * @swagger
@@ -72,7 +72,7 @@ router.get('/export-schema', authMiddleware, controller.exportSchema);
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/sync-schema', authMiddleware, controller.syncSchema);
+router.post('/sync-schema', [authMiddleware, roleAuth(['superadmin'])], controller.syncSchema);
 
 /**
  * @swagger
@@ -105,7 +105,7 @@ router.post('/sync-schema', authMiddleware, controller.syncSchema);
  *       500: 
  *         description: 服务器内部错误
  */
-router.post('/backup-database', authMiddleware, controller.backupDatabase);
+router.post('/backup-database', [authMiddleware, roleAuth(['superadmin'])], controller.backupDatabase);
 
 
 
@@ -137,6 +137,6 @@ router.post('/backup-database', authMiddleware, controller.backupDatabase);
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/backup-list', authMiddleware, controller.getBackupList);
+router.get('/backup-list', [authMiddleware, roleAuth(['superadmin'])], controller.getBackupList);
 
 export default router;

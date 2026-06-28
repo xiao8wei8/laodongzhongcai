@@ -48,13 +48,15 @@ export abstract class BaseRepository<T> {
   }
 
   async create(data: Partial<T>): Promise<T> {
-    const id = this.generateId();
-    const insertData = { id, ...data } as any;
+    const generatedId = this.generateId();
+    const insertData = { id: generatedId, ...data } as any;
     
     const { sql, values } = this.buildInsertSql(insertData);
     await pool.query(sql, values);
     
-    return await this.findById(id) as T;
+    // 注意：调用方可能显式传入 data.id（例如迁移脚本/控制器里使用 uuidv4），
+    // 插入时应以最终落库的 insertData.id 为准；否则会出现“插入成功但查询返回 null”。
+    return await this.findById(insertData.id) as T;
   }
 
   async update(id: string, data: Partial<T>): Promise<T | null> {

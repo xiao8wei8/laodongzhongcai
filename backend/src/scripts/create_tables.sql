@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS users (
   idCard VARCHAR(50) COMMENT '身份证号',
   wechat_mp_openid VARCHAR(255) DEFAULT NULL COMMENT '微信小程序 openid',
   wechat_web_openid VARCHAR(255) DEFAULT NULL COMMENT '微信网站应用 openid',
+  nickname VARCHAR(100) DEFAULT NULL COMMENT '微信昵称/展示昵称',
+  avatarUrl VARCHAR(500) DEFAULT NULL COMMENT '头像地址',
+  isSuperAdmin BOOLEAN DEFAULT FALSE COMMENT '是否超级管理员',
   isOnDuty BOOLEAN DEFAULT FALSE COMMENT '是否值班',
   lastOnDutyDate DATETIME COMMENT '最后值班日期',
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -35,12 +38,41 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_users_wechat_web_openid (wechat_web_openid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
+-- 用户反馈表
+CREATE TABLE IF NOT EXISTS feedbacks (
+  id CHAR(36) PRIMARY KEY COMMENT '反馈ID (UUID)',
+  userId CHAR(36) NOT NULL COMMENT '提交用户ID',
+  source ENUM('miniapp', 'admin_web') NOT NULL DEFAULT 'miniapp' COMMENT '反馈来源',
+  type ENUM('bug', 'suggestion', 'complaint', 'other') NOT NULL DEFAULT 'other' COMMENT '反馈类型',
+  title VARCHAR(255) NOT NULL COMMENT '反馈标题',
+  content TEXT NOT NULL COMMENT '反馈内容',
+  contactName VARCHAR(100) DEFAULT NULL COMMENT '联系人姓名',
+  contactPhone VARCHAR(50) DEFAULT NULL COMMENT '联系人手机号',
+  screenshots JSON DEFAULT NULL COMMENT '截图列表',
+  status ENUM('pending', 'processing', 'resolved', 'closed') NOT NULL DEFAULT 'pending' COMMENT '处理状态',
+  replyContent TEXT DEFAULT NULL COMMENT '处理回复',
+  handledBy CHAR(36) DEFAULT NULL COMMENT '处理人ID',
+  handledAt DATETIME DEFAULT NULL COMMENT '处理时间',
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_feedback_user (userId),
+  INDEX idx_feedback_status (status),
+  INDEX idx_feedback_source (source),
+  INDEX idx_feedback_created_at (createdAt DESC),
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (handledBy) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户反馈表';
+
 -- 2. 案件表
 CREATE TABLE IF NOT EXISTS cases (
   id CHAR(36) PRIMARY KEY COMMENT '案件ID (UUID)',
   caseNumber VARCHAR(100) NOT NULL UNIQUE COMMENT '案件编号',
   applicantId CHAR(36) NOT NULL COMMENT '申请人ID',
   respondentId CHAR(36) NOT NULL COMMENT '被申请人ID',
+  applicantDisplayName VARCHAR(100) DEFAULT NULL COMMENT '申请人姓名快照',
+  respondentDisplayName VARCHAR(100) DEFAULT NULL COMMENT '被申请人姓名快照',
+  applicantPhone VARCHAR(50) DEFAULT NULL COMMENT '申请人联系电话快照',
+  respondentPhone VARCHAR(50) DEFAULT NULL COMMENT '被申请人联系电话快照',
   disputeType VARCHAR(100) NOT NULL COMMENT '争议类型',
   caseAmount DECIMAL(15, 2) COMMENT '案件金额',
   requestItems TEXT NOT NULL COMMENT '请求事项',
@@ -71,9 +103,6 @@ CREATE TABLE IF NOT EXISTS visitor_records (
   disputeType VARCHAR(100) COMMENT '争议类型',
   reason TEXT NOT NULL COMMENT '来访原因',
   mediatorId CHAR(36) COMMENT '调解员ID',
-  sendSmsVerification BOOLEAN DEFAULT FALSE COMMENT '发送短信验证',
-  sendEmailVerification BOOLEAN DEFAULT FALSE COMMENT '发送邮件验证',
-  email VARCHAR(255) COMMENT '邮箱',
   status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending' COMMENT '状态',
   createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

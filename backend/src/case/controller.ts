@@ -8,14 +8,117 @@ import scheduleRepository from '../repositories/scheduleRepository';
 import messageRepository from '../repositories/messageRepository';
 import { io } from '../server';
 
-// 生成案件编号
+// 生成案件编号（基础格式）
 const generateCaseNumber = () => {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-  return `LA${year}${month}${day}${random}`;
+  const time = `${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}${String(date.getSeconds()).padStart(2, '0')}`;
+  const random = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  return `LA${year}${month}${day}${time}${random}`;
+};
+
+// 生成唯一案件编号（避免唯一索引冲突）
+const generateUniqueCaseNumber = async () => {
+  for (let i = 0; i < 10; i++) {
+    const caseNumber = generateCaseNumber();
+    const existing = await caseRepository.findByCaseNumber(caseNumber);
+    if (!existing) {
+      return caseNumber;
+    }
+  }
+
+  return `LA${Date.now()}${Math.floor(Math.random() * 1000)}`;
+};
+
+const getCaseStatusText = (status: string) => {
+  const statusMap: Record<string, string> = {
+    pending: '待处理',
+    processing: '处理中',
+    completed: '已完成',
+    failed: '失败'
+  };
+  return statusMap[status] || status;
+};
+
+const parseScheduleDate = (rawDate: any) => {
+  const value = String(rawDate || '').trim();
+  if (!value) return null;
+
+  let normalized = value;
+  let match = value.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    normalized = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  } else {
+    match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) {
+      const [, month, day, year] = match;
+      normalized = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const resolveRelatedUserId = (value: any) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    return String(value.id || value._id || '').trim();
+  }
+  return String(value).trim();
+};
+
+const isOwnedByCurrentUser = (caseLike: any, currentUserId?: string) => {
+  if (!caseLike || !currentUserId) return false;
+  const applicantId = resolveRelatedUserId(caseLike.applicantId || caseLike.applicantInfo);
+  const respondentId = resolveRelatedUserId(caseLike.respondentId || caseLike.respondentInfo);
+  return applicantId === currentUserId || respondentId === currentUserId;
+};
+
+const isOwnedVisitorRecordByCurrentUser = (visitorRecord: any, reqUser?: any) => {
+  if (!visitorRecord || !reqUser) return false;
+  const visitorName = String(visitorRecord.visitorName || visitorRecord.applicantName || '').trim();
+  const visitorPhone = String(visitorRecord.phone || visitorRecord.applicantPhone || '').trim();
+  const userName = String(reqUser.name || reqUser.nickname || reqUser.username || '').trim();
+  const userPhone = String(reqUser.phone || '').trim();
+
+  return Boolean(
+    (visitorName && userName && visitorName === userName) ||
+    (visitorPhone && userPhone && visitorPhone === userPhone)
+  );
+};
+
+const isConsultationCase = (caseLike: any) => {
+  if (!caseLike) return false;
+  const disputeType = String(caseLike.disputeType || caseLike.title || '').trim();
+  const caseNumber = String(caseLike.caseNumber || '').trim();
+  return disputeType === '咨询' || caseNumber.startsWith('CONSULT');
+};
+
+const mapCaseListItem = (item: any) => {
+  const consultation = isConsultationCase(item) || !!item.isConsultation;
+  const mediatorName = item.mediatorName || item.mediatorId?.name || '';
+  const mediatorPhone = item.mediatorPhone || item.mediatorId?.phone || '';
+
+  return {
+    ...item,
+    _id: item._id || item.id,
+    applicantName: item.applicantName || item.applicantDisplayName || item.applicantId?.name || '',
+    applicantPhone: item.applicantPhone || item.applicantId?.phone || '',
+    respondentName: item.respondentName || item.respondentDisplayName || item.respondentId?.name || '',
+    respondentPhone: item.respondentPhone || item.respondentId?.phone || '',
+    mediatorName,
+    mediatorPhone,
+    latestProgress: item.latestProgress || '',
+    latestProgressAt: item.latestProgressAt || item.updatedAt || item.createdAt || null,
+    tenantName: item.tenantName || item.street || '',
+    isConsultation: consultation
+  };
 };
 
 // 获取案件列表
@@ -29,11 +132,19 @@ export const getCases = async (req: express.Request, res: express.Response) => {
     const { status, disputeType, keyword } = req.query;
     
     // 先获取所有正式案件
-    let cases = await caseRepository.findAllWithRelations();
+    let cases = await caseRepository.findAllWithRelations(undefined, undefined, req.user?.role === 'tenant_admin' ? (req.user?.tenantId || null) : undefined);
     
     // 先获取所有到访登记记录
-    let visitorRecords = await visitorRecordRepository.findAll();
+    let visitorRecords = await visitorRecordRepository.findAllWithRelations(req.user?.role === 'tenant_admin' ? (req.user?.tenantId || null) : undefined);
     
+    const migratedVisitorCaseNumbers = new Set(
+      cases
+        .filter((item: any) => isConsultationCase(item))
+        .map((item: any) => String(item.caseNumber || '').trim())
+        .filter(Boolean)
+    );
+    visitorRecords = visitorRecords.filter((record: any) => !migratedVisitorCaseNumbers.has(String(record.registerNumber || '').trim()));
+
     // 应用关键词搜索
     if (keyword) {
       const searchKeyword = keyword as string;
@@ -79,12 +190,13 @@ export const getCases = async (req: express.Request, res: express.Response) => {
     } else if (req.user?.role === 'personal' || req.user?.role === 'company') {
       console.log('个人/企业用户过滤逻辑执行');
       // 个人和企业用户只能看到自己的案件
-      cases = cases.filter(caseObj => {
-        return caseObj.applicantId === req.user?.id || caseObj.respondentId === req.user?.id;
-      });
+      cases = cases.filter(caseObj => isOwnedByCurrentUser(caseObj, req.user?.id));
       // 个人和企业用户不应该看到到访登记记录
       console.log('清空到访登记记录');
       visitorRecords = [];
+    } else if (req.user?.role === 'tenant_admin') {
+      cases = cases.filter(caseObj => caseObj.tenantId === req.user?.tenantId);
+      visitorRecords = visitorRecords.filter((record: any) => record.tenantId === req.user?.tenantId);
     } else {
       console.log('其他用户角色，不执行过滤');
     }
@@ -103,8 +215,17 @@ export const getCases = async (req: express.Request, res: express.Response) => {
       respondentName: '未知',
       disputeType: record.disputeType || '未知',
       caseAmount: 0,
+      requestItems: record.reason || '',
+      factsReasons: record.reason || '',
+      isConsultation: record.disputeType === '咨询' || record.visitType === 'phone',
       status: record.status || 'pending',
       mediatorId: record.mediatorId,
+      mediatorName: record.mediatorName || '',
+      mediatorPhone: record.mediatorPhone || '',
+      latestProgress: record.reason || '',
+      latestProgressAt: record.updatedAt || record.createdAt,
+      tenantName: record.street || '',
+      applicantPhone: record.phone || '',
       createdAt: record.createdAt
     }));
     
@@ -112,11 +233,18 @@ export const getCases = async (req: express.Request, res: express.Response) => {
     console.log('到访登记记录状态:', visitorRecords.map(r => ({ id: r.id, status: r.status })));
     
     // 合并两种记录，确保不重复
-    const allCases = [...formattedVisitorCases, ...cases].map((item: any) => ({
-      ...item,
-      // 前端普遍使用 _id 作为主键；这里做一次统一兼容
-      _id: item._id || item.id
-    }));
+    const allCases = [...formattedVisitorCases, ...cases].map((item: any) => mapCaseListItem(item)).sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+
+      // 默认按登记/创建时间倒序，最新的排在最上面
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+
+      // 时间相同再按案件编号倒序，保证列表顺序稳定
+      return String(b.caseNumber || '').localeCompare(String(a.caseNumber || ''));
+    });
   
     res.json({ cases: allCases });
   } catch (error) {
@@ -162,6 +290,8 @@ export const getCaseById = async (req: express.Request, res: express.Response) =
           disputeType: visitorRecord.disputeType || '未知',
           caseAmount: 0,
           status: visitorRecord.status || 'pending',
+          tenantId: visitorRecord.tenantId || null,
+          tenantName: visitorRecord.street || null,
           mediatorId: visitorRecord.mediatorId,
           createdAt: visitorRecord.createdAt
         } as any;
@@ -180,19 +310,68 @@ export const getCaseById = async (req: express.Request, res: express.Response) =
       caseWithRelations = relations || caseData;
     }
 
-    // 统一 _id 字段，避免前端路由出现 /case/undefined
-    if (caseWithRelations && !caseWithRelations._id) {
-      caseWithRelations._id = caseData.id;
+    // 统一字段结构，避免前端针对不同来源数据做猜测
+    if (caseWithRelations) {
+      if (!caseWithRelations._id) {
+        caseWithRelations._id = caseData.id;
+      }
+
+      const applicantInfo = caseWithRelations.applicantInfo || {
+        id: typeof caseWithRelations.applicantId === 'string' ? caseWithRelations.applicantId : caseWithRelations.applicantId?.id,
+        name: caseWithRelations.resolvedApplicantDisplayName || caseWithRelations.applicantDisplayName || caseWithRelations.applicantName || caseWithRelations.applicantId?.name || '',
+        phone: caseWithRelations.resolvedApplicantPhone || caseWithRelations.applicantPhone || caseWithRelations.applicantUserPhone || caseWithRelations.applicantId?.phone || '',
+        type: caseWithRelations.applicantRole || caseWithRelations.applicantId?.role || '',
+      };
+
+      const respondentInfo = caseWithRelations.respondentInfo || {
+        id: typeof caseWithRelations.respondentId === 'string' ? caseWithRelations.respondentId : caseWithRelations.respondentId?.id,
+        name: caseWithRelations.resolvedRespondentDisplayName || caseWithRelations.respondentDisplayName || caseWithRelations.respondentName || caseWithRelations.respondentId?.name || '',
+        phone: caseWithRelations.resolvedRespondentPhone || caseWithRelations.respondentPhone || caseWithRelations.respondentUserPhone || caseWithRelations.respondentId?.phone || '',
+        type: caseWithRelations.respondentRole === 'personal' ? 'personal' : 'company',
+      };
+
+      const mediatorInfo = caseWithRelations.mediatorInfo || {
+        id: typeof caseWithRelations.mediatorId === 'string' ? caseWithRelations.mediatorId : caseWithRelations.mediatorId?.id,
+        name: caseWithRelations.mediatorName || caseWithRelations.mediatorId?.name || '',
+        phone: caseWithRelations.mediatorPhone || caseWithRelations.mediatorUserPhone || caseWithRelations.mediatorId?.phone || '',
+        type: caseWithRelations.mediatorRole || caseWithRelations.mediatorId?.role || '',
+      };
+
+      const snapshotUpdates: any = {};
+      if (!caseWithRelations.applicantDisplayName && applicantInfo.name) snapshotUpdates.applicantDisplayName = applicantInfo.name;
+      if (!caseWithRelations.respondentDisplayName && respondentInfo.name) snapshotUpdates.respondentDisplayName = respondentInfo.name;
+      if (!caseWithRelations.applicantPhone && applicantInfo.phone) snapshotUpdates.applicantPhone = applicantInfo.phone;
+      if (!caseWithRelations.respondentPhone && respondentInfo.phone) snapshotUpdates.respondentPhone = respondentInfo.phone;
+
+      if (Object.keys(snapshotUpdates).length > 0) {
+        await caseRepository.update(caseData.id, snapshotUpdates);
+      }
+
+      caseWithRelations = {
+        ...caseWithRelations,
+        isConsultation: isConsultationCase(caseWithRelations),
+        applicantInfo,
+        respondentInfo,
+        mediatorInfo,
+        tenantName: caseWithRelations.tenantName || caseWithRelations.street || '',
+        applicantDisplayName: snapshotUpdates.applicantDisplayName || caseWithRelations.applicantDisplayName || applicantInfo.name || '',
+        respondentDisplayName: snapshotUpdates.respondentDisplayName || caseWithRelations.respondentDisplayName || respondentInfo.name || '',
+        applicantPhone: snapshotUpdates.applicantPhone || caseWithRelations.applicantPhone || applicantInfo.phone || '',
+        respondentPhone: snapshotUpdates.respondentPhone || caseWithRelations.respondentPhone || respondentInfo.phone || '',
+        amount: caseWithRelations.caseAmount ?? caseWithRelations.amount ?? 0,
+        description: caseWithRelations.factsReasons ?? caseWithRelations.description ?? '',
+        facts: caseWithRelations.factsReasons ?? caseWithRelations.facts ?? '',
+        requests: caseWithRelations.requestItems ?? caseWithRelations.requests ?? '',
+      };
     }
     
     // 检查权限
     const isAuthorized = 
-      req.user?.role === 'admin' ||
+      req.user?.role === 'superadmin' ||
+      (req.user?.role === 'tenant_admin' && caseWithRelations?.tenantId === req.user?.tenantId) ||
       req.user?.role === 'mediator' ||
-      (caseWithRelations && (
-        caseWithRelations.applicantId === req.user?.id || 
-        caseWithRelations.respondentId === req.user?.id
-      ));
+      isOwnedByCurrentUser(caseWithRelations, req.user?.id) ||
+      (isVisitorRecord && isOwnedVisitorRecordByCurrentUser(caseWithRelations, req.user));
     
     if (!isAuthorized) {
       return res.status(403).json({ message: '权限不足' });
@@ -208,13 +387,66 @@ export const getCaseById = async (req: express.Request, res: express.Response) =
   }
 };
 
+// 获取案件进度
+export const getCaseProgress = async (req: express.Request, res: express.Response) => {
+  try {
+    const caseId = req.params.id;
+
+    // 先尝试按案件编号查询正式案件
+    let caseData = await caseRepository.findByCaseNumber(caseId);
+
+    // 如果按编号查询不到，尝试按ID查询
+    if (!caseData) {
+      caseData = await caseRepository.findById(caseId);
+    }
+
+    let isVisitorRecord = false;
+    let visitorRecord: any = null;
+
+    // 如果不是正式案件，尝试查询到访登记记录
+    if (!caseData) {
+      visitorRecord = await visitorRecordRepository.findByRegisterNumber(caseId);
+      if (!visitorRecord) {
+        visitorRecord = await visitorRecordRepository.findById(caseId);
+      }
+
+      if (visitorRecord) {
+        isVisitorRecord = true;
+      } else {
+        return res.status(404).json({ message: '案件不存在' });
+      }
+    }
+
+    // 权限校验：管理员全可见；调解员可见；当事人仅可见自己的案件
+    const isAuthorized =
+      req.user?.role === 'superadmin' ||
+      (req.user?.role === 'tenant_admin' && caseData?.tenantId === req.user?.tenantId) ||
+      req.user?.role === 'mediator' ||
+      isOwnedByCurrentUser(caseData, req.user?.id) ||
+      (isVisitorRecord && isOwnedVisitorRecordByCurrentUser(visitorRecord, req.user));
+
+    if (!isAuthorized) {
+      return res.status(403).json({ message: '权限不足' });
+    }
+
+    const progress = isVisitorRecord
+      ? []
+      : await caseProgressRepository.findByCaseIdWithRelations(caseData!.id);
+
+    res.json({ progress });
+  } catch (error) {
+    console.error('获取案件进度错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+};
+
 // 创建案件
 export const createCase = async (req: express.Request, res: express.Response) => {
   try {
     const { applicantId, respondentId, disputeType, caseAmount, requestItems, factsReasons } = req.body;
     
     // 生成案件编号
-    const caseNumber = generateCaseNumber();
+    const caseNumber = await generateUniqueCaseNumber();
     
     // 查询当日值班调解员
     const onDutyMediators = await userRepository.findOnDutyMediators();
@@ -303,16 +535,25 @@ export const updateCaseStatus = async (req: express.Request, res: express.Respon
       }
     } else {
       // 更新状态
-      await caseRepository.update(caseData.id, {
+      const nextStatus = String(status || '').trim();
+      const updatePayload: any = {
         status,
         updatedAt: new Date()
-      });
+      };
+
+      if (nextStatus === 'completed' || nextStatus === 'failed') {
+        updatePayload.closeTime = new Date();
+      } else {
+        updatePayload.closeTime = null;
+      }
+
+      await caseRepository.update(caseData.id, updatePayload);
       
       // 创建案件进度记录
       await caseProgressRepository.create({
         id: uuidv4(),
         caseId: caseData.id,
-        content: `案件状态更新为${status}${reason ? `，原因：${reason}` : ''}`,
+        content: `案件状态更新为${getCaseStatusText(status)}${reason ? `，原因：${reason}` : ''}`,
         type: status === 'completed' ? 'close' : 'mediate',
         creatorId: req.user?.id,
         createdAt: new Date()
@@ -365,6 +606,12 @@ export const assignMediator = async (req: express.Request, res: express.Response
       
       if (visitorRecord) {
         isVisitorRecord = true;
+        if (req.user?.role === 'tenant_admin' && visitorRecord.tenantId !== req.user?.tenantId) {
+          return res.status(403).json({ message: '无权分配其他街道的案件' });
+        }
+        if ((mediator as any).tenantId !== (visitorRecord as any).tenantId) {
+          return res.status(400).json({ message: '只能分配给同街道的调解员' });
+        }
         // 更新到访登记记录的调解员
         await visitorRecordRepository.update(visitorRecord.id, {
           mediatorId
@@ -373,6 +620,12 @@ export const assignMediator = async (req: express.Request, res: express.Response
         return res.status(404).json({ message: '案件不存在' });
       }
     } else {
+      if (req.user?.role === 'tenant_admin' && caseData.tenantId !== req.user?.tenantId) {
+        return res.status(403).json({ message: '无权分配其他街道的案件' });
+      }
+      if ((mediator as any).tenantId !== (caseData as any).tenantId) {
+        return res.status(400).json({ message: '只能分配给同街道的调解员' });
+      }
       // 分配调解员
       await caseRepository.assignMediator(caseData.id, mediatorId);
       
@@ -556,11 +809,86 @@ export const addCaseProgress = async (req: express.Request, res: express.Respons
   }
 };
 
+// 获取当前用户可见的日程汇总
+export const getScheduleOverview = async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: '未认证' });
+    }
+
+    const schedules = await scheduleRepository.findVisibleSchedules(req.user);
+    const visibleSchedules = schedules
+      .filter((item: any) => {
+        if (req.user?.role === 'superadmin') return true;
+        if (req.user?.role === 'tenant_admin') {
+          return item.tenantId === req.user?.tenantId || item.visitorTenantId === req.user?.tenantId;
+        }
+        if (req.user?.role === 'mediator') {
+          return item.mediatorId === req.user?.id || item.visitorMediatorId === req.user?.id;
+        }
+        if (req.user?.role === 'personal' || req.user?.role === 'company') {
+          const visitorLike = {
+            visitorName: item.visitorName,
+            phone: item.visitorPhone
+          };
+          return (
+            item.applicantId === req.user?.id ||
+            item.respondentId === req.user?.id ||
+            isOwnedVisitorRecordByCurrentUser(visitorLike, req.user)
+          );
+        }
+        return true;
+      })
+      .map((item: any) => ({
+        _id: item.id,
+        id: item.id,
+        caseId: item.caseId,
+        caseNumber: item.caseNumber || '',
+        date: item.date,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        createdAt: item.createdAt,
+        createdBy: {
+          name: item.creatorName || '未知'
+        }
+      }));
+
+    res.json({ schedules: visibleSchedules });
+  } catch (error) {
+    console.error('获取日程汇总错误:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+};
+
+export const getMediatorAnalysisSummary = async (req: express.Request, res: express.Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: '未认证' });
+    }
+
+    if (req.user.role !== 'mediator') {
+      return res.status(403).json({ message: '仅调解员可查看办案分析摘要' });
+    }
+
+    const summary = await caseRepository.getMediatorAnalysisSummary(String(req.user.id));
+    res.json(summary);
+  } catch (error) {
+    console.error('获取调解员办案分析摘要失败:', error);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+};
+
 // 添加案件日程
 export const addCaseSchedule = async (req: express.Request, res: express.Response) => {
   try {
     const caseId = req.params.id;
     const { date, title, description, category } = req.body;
+    const parsedDate = parseScheduleDate(date);
+
+    if (!parsedDate) {
+      return res.status(400).json({ message: '日程日期格式不正确' });
+    }
     
     // 验证案件是否存在
     let caseData = await caseRepository.findByCaseNumber(caseId);
@@ -589,7 +917,7 @@ export const addCaseSchedule = async (req: express.Request, res: express.Respons
     const schedule = await scheduleRepository.create({
       id: uuidv4(),
       caseId: caseData?.id || (isVisitorRecord ? visitorRecord.id : caseId),
-      date: new Date(date),
+      date: parsedDate,
       title: title || '案件相关日程',
       description: description || '',
       category: category || '其他',
@@ -1017,15 +1345,20 @@ export const getMyCases = async (req: express.Request, res: express.Response) =>
     // 获取到访登记记录
     const visitorRecords = await visitorRecordRepository.findAll();
 
+    const migratedVisitorCaseNumbers = new Set(
+      allCases
+        .filter((item: any) => isConsultationCase(item))
+        .map((item: any) => String(item.caseNumber || '').trim())
+        .filter(Boolean)
+    );
+
     // 根据用户角色过滤 - 只显示当前用户相关的案件
     const userId = req.user.id;
     const userName = req.user.name || '';
 
+    // 正式案件必须按用户ID归属过滤，避免“同名用户”看到并无权限访问的案件
     let filteredCases = allCases.filter((c: any) => {
-      return c.applicantId === userId ||
-        c.respondentId === userId ||
-        (c.applicantName && c.applicantName === userName) ||
-        (c.respondentName && c.respondentName === userName);
+      return isOwnedByCurrentUser(c, userId);
     });
 
     // 应用关键词搜索
@@ -1042,9 +1375,10 @@ export const getMyCases = async (req: express.Request, res: express.Response) =>
       });
     }
 
-    // 将 visitor records 也合并显示（如果该用户是访客）
+    // 到访登记没有标准的 applicantId/respondentId，这里仅对 visitor 记录保留名称/手机号兜底
     const myVisitorRecords = visitorRecords.filter((v: any) => {
-      return v.visitorName === userName || v.phone === (req.user as any).phone;
+      return !migratedVisitorCaseNumbers.has(String(v.registerNumber || '').trim()) &&
+        (v.visitorName === userName || v.phone === (req.user as any).phone);
     });
 
     // 合并结果
@@ -1052,8 +1386,9 @@ export const getMyCases = async (req: express.Request, res: express.Response) =>
       ...filteredCases.map((c: any) => ({
         id: c.id,
         type: 'formal',
+        isConsultation: isConsultationCase(c),
         caseNumber: c.caseNumber,
-        title: c.disputeType || '争议调解',
+        title: isConsultationCase(c) ? '咨询' : (c.disputeType || '争议调解'),
         description: c.requestItems || '',
         applicantName: c.applicantName,
         respondentName: c.respondentName,

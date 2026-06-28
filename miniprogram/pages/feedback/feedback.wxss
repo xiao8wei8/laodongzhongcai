@@ -1,0 +1,143 @@
+.feedback-container {
+  padding: 24rpx;
+}
+
+.feedback-card {
+  margin-bottom: 24rpx;
+  padding: 28rpx;
+}
+
+.form-group {
+  margin-bottom: 24rpx;
+}
+
+.form-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f1f1f;
+  margin-bottom: 12rpx;
+}
+
+.form-input,
+.form-textarea,
+.picker-display {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 16rpx;
+  border: 2rpx solid #e5e7eb;
+  background: #fff;
+  padding: 0 24rpx;
+  font-size: 28rpx;
+  color: #1f1f1f;
+}
+
+.form-input,
+.picker-display {
+  height: 84rpx;
+  line-height: 84rpx;
+}
+
+.form-textarea {
+  min-height: 220rpx;
+  padding: 20rpx 24rpx;
+}
+
+.submit-btn {
+  margin-top: 8rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%);
+  color: #fff;
+  font-size: 30rpx;
+}
+
+.submit-btn::after {
+  border: none;
+}
+
+.feedback-item {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.feedback-item:last-child {
+  border-bottom: none;
+}
+
+.feedback-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+}
+
+.feedback-title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.feedback-status {
+  font-size: 24rpx;
+  border-radius: 999rpx;
+  padding: 8rpx 18rpx;
+}
+
+.status-pending {
+  background: #fff7e6;
+  color: #d46b08;
+}
+
+.status-processing {
+  background: #e6f4ff;
+  color: #0958d9;
+}
+
+.status-resolved {
+  background: #f6ffed;
+  color: #389e0d;
+}
+
+.status-closed {
+  background: #f5f5f5;
+  color: #595959;
+}
+
+.feedback-meta {
+  margin-top: 10rpx;
+  color: #8c8c8c;
+  font-size: 24rpx;
+}
+
+.feedback-content {
+  margin-top: 14rpx;
+  color: #262626;
+  line-height: 1.7;
+  font-size: 28rpx;
+}
+
+.feedback-reply {
+  margin-top: 16rpx;
+  background: #fafafa;
+  border-radius: 14rpx;
+  padding: 18rpx 20rpx;
+}
+
+.feedback-reply-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.feedback-reply-content {
+  color: #434343;
+  line-height: 1.7;
+  font-size: 26rpx;
+}
+
+.empty-text {
+  text-align: center;
+  color: #999;
+  font-size: 26rpx;
+  padding: 30rpx 0 12rpx;
+}

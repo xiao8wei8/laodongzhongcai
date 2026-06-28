@@ -18,6 +18,13 @@ class SmsService {
     });
   }
 
+  private normalizePhone(phone: string): string {
+    const clean = String(phone || '').trim();
+    if (/^\+/.test(clean)) return clean;
+    if (/^1\d{10}$/.test(clean)) return `+86${clean}`;
+    return clean;
+  }
+
   /**
    * 发送验证码短信
    * @param phone 手机号
@@ -31,7 +38,7 @@ class SmsService {
         SdkAppId: this.config.sdkAppId,
         SignName: this.config.signName,
         TemplateId: this.config.templateIds.verification,
-        PhoneNumberSet: [phone],
+        PhoneNumberSet: [this.normalizePhone(phone)],
         TemplateParamSet: [code],
       });
 
@@ -57,7 +64,7 @@ class SmsService {
         SdkAppId: this.config.sdkAppId,
         SignName: this.config.signName,
         TemplateId: templateId,
-        PhoneNumberSet: [phone],
+        PhoneNumberSet: [this.normalizePhone(phone)],
         TemplateParamSet: params,
       });
 

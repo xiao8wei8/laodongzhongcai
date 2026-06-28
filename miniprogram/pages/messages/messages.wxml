@@ -16,22 +16,40 @@
         <text class="text-xs text-muted">{{item.createTimeText}}</text>
       </view>
       <view class="text-sm mt-10" style="line-height: 1.8;">{{item.content || item.summary || ''}}</view>
+      <view wx:if="{{item.firstImage}}" class="broadcast-image-wrap">
+        <image
+          class="broadcast-image"
+          src="{{item.firstImage}}"
+          mode="widthFix"
+          data-id="{{item.id}}"
+          data-url="{{item.firstImage}}"
+          bindtap="previewBroadcastImage"
+        />
+        <view wx:if="{{item.attachmentCount > 1}}" class="text-xs text-muted mt-10">共 {{item.attachmentCount}} 个附件</view>
+      </view>
     </view>
   </block>
 
   <!-- 我的消息 -->
   <block wx:if="{{activeTab === 'message'}}">
-    <view wx:if="{{messages.length === 0}}" class="empty-state">
+    <view wx:if="{{isGuestMode}}" class="empty-state">
+      <view class="empty-state-icon">🔐</view>
+      <view class="empty-state-text">登录后可查看与你相关的案件消息</view>
+      <button class="btn-outline btn-sm mt-20" bindtap="goLogin">去登录</button>
+    </view>
+    <view wx:elif="{{messages.length === 0}}" class="empty-state">
       <view class="empty-state-icon">💬</view>
       <view class="empty-state-text">暂无消息</view>
     </view>
-    <view wx:for="{{messages}}" wx:key="id" class="card message-card" data-id="{{item.caseId || item.id}}" bindtap="goCaseDetail">
-      <view class="flex-between">
-        <view class="font-bold">{{item.senderName || '调解员'}}</view>
-        <text class="text-xs text-muted">{{item.createTimeText}}</text>
+    <block wx:else>
+      <view wx:for="{{messages}}" wx:key="id" class="card message-card" data-id="{{item.caseId || item.id}}" bindtap="goCaseDetail">
+        <view class="flex-between">
+          <view class="font-bold">{{item.senderName || '调解员'}}</view>
+          <text class="text-xs text-muted">{{item.createTimeText}}</text>
+        </view>
+        <view class="text-sm text-muted mt-10" style="line-height: 1.6;">{{item.content}}</view>
+        <view wx:if="{{item.caseNumber}}" class="text-xs text-primary mt-10">相关案件：{{item.caseNumber}}</view>
       </view>
-      <view class="text-sm text-muted mt-10" style="line-height: 1.6;">{{item.content}}</view>
-      <view wx:if="{{item.caseNumber}}" class="text-xs text-primary mt-10">相关案件：{{item.caseNumber}}</view>
-    </view>
+    </block>
   </block>
 </view>

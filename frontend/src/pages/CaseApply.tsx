@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Card, Steps, Form, Input, Select, Button, message, Upload, Spin, Alert, Typography } from 'antd';
-import { SaveOutlined, UploadOutlined, ArrowLeftOutlined, EditOutlined } from '@ant-design/icons';
-
-const { Title } = Typography;
+import { Card, Steps, Form, Input, Select, Button, message, Upload, Alert, Typography, Space, Tag, Row, Col, Statistic, Avatar } from 'antd';
+import { SaveOutlined, UploadOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
+import { PageHero, PageSectionCard, PageShell } from '../components/common/PageKit';
 
 const { Step } = Steps;
 const { Option } = Select;
 const { TextArea } = Input;
 const { Dragger } = Upload;
+const { Text } = Typography;
 
 const CaseApply: React.FC = () => {
   const [current, setCurrent] = useState(0);
@@ -30,7 +30,6 @@ const CaseApply: React.FC = () => {
       const initialData = {
         applicantName: userInfo.name || '',
         applicantPhone: userInfo.phone || '',
-        applicantEmail: userInfo.email || '',
         applicantIdCard: userInfo.idCard || ''
       };
       setFormData(initialData);
@@ -44,7 +43,7 @@ const CaseApply: React.FC = () => {
     { title: '案件信息', description: '填写案件基本信息' },
     { title: '争议详情', description: '填写争议事实和请求事项' },
     { title: '证据上传', description: '上传案件相关证据' },
-    { title: '提交申请', description: '确认信息并提交申请' }
+    { title: '登记确认', description: '确认信息并完成登记' }
   ];
 
   // 争议类型选项
@@ -96,13 +95,11 @@ const CaseApply: React.FC = () => {
         applicantInfo: {
           name: formData.applicantName,
           phone: formData.applicantPhone,
-          email: formData.applicantEmail,
           idCard: formData.applicantIdCard
         },
         respondentInfo: {
           name: formData.respondentName,
           phone: formData.respondentPhone,
-          email: formData.respondentEmail,
           idCard: formData.respondentIdCard,
           type: formData.respondentType
         },
@@ -116,7 +113,7 @@ const CaseApply: React.FC = () => {
       
       const response = await api.post('/application', applicationData);
       console.log('申请提交成功，返回的数据:', response.data);
-      message.success('申请提交成功，案件编号：' + response.data.caseNumber);
+      message.success('登记提交成功，案件编号：' + response.data.caseNumber);
       
       // 重置表单
       form.resetFields();
@@ -129,7 +126,7 @@ const CaseApply: React.FC = () => {
     } catch (error: any) {
       console.error('提交申请失败:', error);
       console.error('错误详情:', error.response?.data);
-      message.error('申请提交失败');
+      message.error('登记提交失败');
     } finally {
       setSubmitLoading(false);
     }
@@ -152,7 +149,7 @@ const CaseApply: React.FC = () => {
       case 0:
         return (
           <>
-            <h3>申请人信息</h3>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>申请人信息</div>
             <Form.Item
               name="applicantName"
               label="姓名"
@@ -168,12 +165,6 @@ const CaseApply: React.FC = () => {
               <Input placeholder="请输入联系电话" />
             </Form.Item>
             <Form.Item
-              name="applicantEmail"
-              label="电子邮箱"
-            >
-              <Input placeholder="请输入电子邮箱" />
-            </Form.Item>
-            <Form.Item
               name="applicantIdCard"
               label="身份证号"
               rules={[{ required: true, message: '请输入身份证号' }]}
@@ -181,7 +172,7 @@ const CaseApply: React.FC = () => {
               <Input placeholder="请输入身份证号" />
             </Form.Item>
 
-            <h3>被申请人信息</h3>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>被申请人信息</div>
             <Form.Item
               name="respondentType"
               label="类型"
@@ -208,12 +199,6 @@ const CaseApply: React.FC = () => {
               rules={[{ required: true, message: '请输入联系电话' }]}
             >
               <Input placeholder="请输入联系电话" />
-            </Form.Item>
-            <Form.Item
-              name="respondentEmail"
-              label="电子邮箱"
-            >
-              <Input placeholder="请输入电子邮箱" />
             </Form.Item>
             <Form.Item
               name="respondentIdCard"
@@ -293,7 +278,7 @@ const CaseApply: React.FC = () => {
         );
       case 4:
         return (
-          <Card title="申请确认">
+            <Card title="登记确认" bordered={false} style={{ background: '#f8fbff', borderRadius: 16 }}>
             <p>请确认以下信息是否正确：</p>
             <p><strong>申请人：</strong>{form.getFieldValue('applicantName')} ({form.getFieldValue('applicantPhone')})</p>
             <p><strong>被申请人：</strong>{form.getFieldValue('respondentName')} ({form.getFieldValue('respondentPhone')})</p>
@@ -309,26 +294,47 @@ const CaseApply: React.FC = () => {
     }
   };
 
-  const handleBack = () => {
-    navigate(-1);
-  };
-
   return (
-    <div style={{ backgroundColor: 'white', padding: 16, borderRadius: 8 }}>
-      <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={handleBack} style={{ marginBottom: 8 }}>
-            返回
-          </Button>
-          <EditOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-          <Title level={2} style={{ margin: 0, fontSize: '18px' }}>申请调解</Title>
-        </div>
-      </div>
-      
+    <PageShell>
+      <PageHero
+        tone="teal"
+        icon={<EditOutlined />}
+        title="到访登记"
+        description="用于快速录入来访咨询或调解登记信息。先完成基础信息，再逐步补充争议详情和材料。"
+        tags={
+          <>
+            <Tag color="cyan-inverse" style={{ borderRadius: 999 }}>分步录入</Tag>
+            <Tag color="geekblue-inverse" style={{ borderRadius: 999 }}>完成后进入案件流转</Tag>
+          </>
+        }
+        note={
+          <Alert
+            type="info"
+            showIcon
+            message="登记建议"
+            description="优先填写基础身份信息和争议类型；事实与理由尽量写清时间、经过和核心诉求，后续处理会更顺。"
+          />
+        }
+        metrics={
+          <Row gutter={[12, 12]}>
+            <Col span={12}>
+              <Card size="small" bordered={false} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.08)' }}>
+                <Statistic title={<span style={{ color: 'rgba(255,255,255,0.72)' }}>当前步骤</span>} value={current + 1} suffix={`/ ${steps.length}`} valueStyle={{ color: '#fff' }} />
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card size="small" bordered={false} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.08)' }}>
+                <Statistic title={<span style={{ color: 'rgba(255,255,255,0.72)' }}>已上传材料</span>} value={evidenceFiles.length} valueStyle={{ color: '#fff' }} />
+              </Card>
+            </Col>
+          </Row>
+        }
+      />
+
       {!isAuthenticated ? (
         <Alert
           message="请先登录"
-          description="提交调解申请需要先登录，请登录后再操作。"
+          description="提交登记信息需要先登录，请登录后再操作。"
           type="warning"
           action={
             <Button type="primary" size="small" onClick={() => navigate('/login')}>
@@ -339,52 +345,57 @@ const CaseApply: React.FC = () => {
           style={{ marginBottom: 16 }}
         />
       ) : (
-        <>
-          <Steps 
-            current={current} 
-            style={{ marginBottom: 16 }}
-            size="small"
+        <div style={{ display: 'grid', gap: 20 }}>
+          <PageSectionCard title="登记步骤">
+            <Steps current={current} size="small">
+              {steps.map((step, index) => (
+                <Step key={index} title={step.title} description={step.description} />
+              ))}
+            </Steps>
+          </PageSectionCard>
+
+          <PageSectionCard
+            title={steps[current]?.title || '到访登记'}
+            extra={
+              <Space wrap>
+                <Avatar size={32} icon={<EditOutlined />} style={{ background: '#e6f4ff', color: '#1677ff' }} />
+                <Text type="secondary">{steps[current]?.description}</Text>
+              </Space>
+            }
           >
-            {steps.map((step, index) => (
-              <Step 
-                key={index} 
-                title={step.title} 
-                description={step.description} 
-              />
-            ))}
-          </Steps>
-          
-          <Card>
             <Form form={form} layout="vertical">
               {renderStepContent()}
-              
-              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                {current > 0 && (
-                  <Button onClick={prev} size="small">
-                    上一步
-                  </Button>
-                )}
-                {current < steps.length - 1 ? (
-                  <Button type="primary" onClick={next} size="small">
-                    下一步
-                  </Button>
-                ) : (
-                  <Button 
-                    type="primary" 
-                    onClick={handleSubmit} 
-                    loading={submitLoading}
-                    icon={<SaveOutlined />}
-                    size="small"
-                  >
-                    提交申请
-                  </Button>
-                )}
+
+              <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  {current > 0 && (
+                    <Button onClick={prev}>
+                      上一步
+                    </Button>
+                  )}
+                </div>
+                <div>
+                  {current < steps.length - 1 ? (
+                    <Button type="primary" onClick={next}>
+                      下一步
+                    </Button>
+                  ) : (
+                    <Button
+                      type="primary"
+                      onClick={handleSubmit}
+                      loading={submitLoading}
+                      icon={<SaveOutlined />}
+                    >
+                      完成登记
+                    </Button>
+                  )}
+                </div>
               </div>
             </Form>
-          </Card>
-        </>
+          </PageSectionCard>
+        </div>
       )}
-    </div>
+    </PageShell>
   );
 };
 

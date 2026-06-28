@@ -2,12 +2,45 @@
 
 const app = () => getApp();
 
-// 获取 API 基础地址
-function getBaseUrl() {
-  const appInstance = getApp();
-  return appInstance && appInstance.globalData.apiBaseUrl
-    ? appInstance.globalData.apiBaseUrl
-    : 'https://www.saifchat.com/laodongzhongcai/api';
+const DEV_API_BASE_URL = 'http://192.168.64.17:5003/laodongzhongcai/api';
+const PROD_API_BASE_URL = 'https://www.saifchat.com/laodongzhongcai/api';
+
+function dedupeUrls(urls) {
+  return Array.from(new Set((urls || []).filter(Boolean)));
+}
+
+function normalizeApiBaseUrl(apiBaseUrl) {
+  if (!apiBaseUrl) return '';
+  return String(apiBaseUrl)
+    .replace('http://192.168.64.149:5003/laodongzhongcai/api', DEV_API_BASE_URL)
+    .replace('http://127.0.0.1:5003/laodongzhongcai/api', DEV_API_BASE_URL)
+    .replace('http://localhost:5003/laodongzhongcai/api', DEV_API_BASE_URL);
+}
+
+// 获取 API 基础地址候选列表
+function getBaseUrlCandidates() {
+  const appInstance = app();
+  const manualApiBaseUrl = normalizeApiBaseUrl(wx.getStorageSync('apiBaseUrlOverride') || '');
+  const currentApiBaseUrl = appInstance && appInstance.globalData && appInstance.globalData.apiBaseUrl
+    ? normalizeApiBaseUrl(appInstance.globalData.apiBaseUrl)
+    : '';
+
+  return dedupeUrls([
+    manualApiBaseUrl,
+    currentApiBaseUrl,
+    DEV_API_BASE_URL,
+    PROD_API_BASE_URL
+  ]);
+}
+
+function persistBaseUrl(baseUrl) {
+  const normalizedBaseUrl = normalizeApiBaseUrl(baseUrl);
+  const appInstance = app();
+  if (appInstance && typeof appInstance.setApiBaseUrl === 'function') {
+    appInstance.setApiBaseUrl(normalizedBaseUrl);
+    return;
+  }
+  wx.setStorageSync('apiBaseUrl', normalizedBaseUrl);
 }
 
 // 获取 token
@@ -18,59 +51,90 @@ function getToken() {
 // 通用请求方法
 function request(options) {
   return new Promise((resolve, reject) => {
-    const { url, method = 'GET', data = {}, header = {} } = options;
+    const { url, method = 'GET', data = {}, header = {}, skipAuthRedirect = false } = options;
     const token = getToken();
+    const baseUrlCandidates = getBaseUrlCandidates();
 
-    wx.request({
-      url: getBaseUrl() + url,
-      method: method,
-      data: data,
-      header: {
-        'content-type': 'application/json',
-        ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
-        ...header
-      },
-      success: (res) => {
-        if (res.statusCode === 401) {
-          // Token 过期，清除登录信息并跳转登录
-          wx.removeStorageSync('token');
-          wx.removeStorageSync('userInfo');
-          wx.reLaunch({ url: '/pages/login/login' });
-          reject({ message: '登录已过期，请重新登录' });
-          return;
-        }
+    const tryRequest = (candidateIndex) => {
+      const baseUrl = baseUrlCandidates[candidateIndex];
+      if (!baseUrl) {
+        reject({ message: '未配置可用的接口地址' });
+        return;
+      }
 
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          const result = res.data;
-          // 返回格式兼容：后端直接返回数据 或 { success, message, data }
-          if (result && typeof result === 'object') {
-            if (result.success === false) {
-              reject(result);
+      wx.request({
+        url: baseUrl + url,
+        method: method,
+        data: data,
+        header: {
+          'content-type': 'application/json',
+          ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+          ...header
+        },
+        success: (res) => {
+          if (res.statusCode === 401) {
+            if (!skipAuthRedirect) {
+              // Token 过期，清除登录信息并跳转登录
+              wx.removeStorageSync('token');
+              wx.removeStorageSync('userInfo');
+              wx.reLaunch({ url: '/pages/login/login' });
+            }
+            reject({
+              message: skipAuthRedirect ? '当前内容暂不可匿名访问' : '登录已过期，请重新登录',
+              statusCode: res.statusCode,
+              baseUrl
+            });
+            return;
+          }
+
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            persistBaseUrl(baseUrl);
+            const result = res.data;
+            // 返回格式兼容：后端直接返回数据 或 { success, message, data }
+            if (result && typeof result === 'object') {
+              if (result.success === false) {
+                reject(result);
+              } else {
+                resolve(result);
+              }
             } else {
               resolve(result);
             }
           } else {
-            resolve(result);
+            reject({
+              message: (res.data && res.data.message) || '请求失败',
+              statusCode: res.statusCode,
+              baseUrl
+            });
           }
-        } else {
-          reject({ message: (res.data && res.data.message) || '请求失败', statusCode: res.statusCode });
+        },
+        fail: (err) => {
+          if (candidateIndex < baseUrlCandidates.length - 1) {
+            tryRequest(candidateIndex + 1);
+            return;
+          }
+
+          reject({
+            message: `网络连接失败，请检查服务是否已启动：${baseUrl}`,
+            baseUrl,
+            details: err && err.errMsg ? err.errMsg : ''
+          });
         }
-      },
-      fail: (err) => {
-        reject({ message: '网络连接失败，请检查网络设置' });
-      }
-    });
+      });
+    };
+
+    tryRequest(0);
   });
 }
 
 // ============ 认证相关 ============
 
 // 账号密码登录（原有后端支持）
-function login(username, password, role) {
+function login(username, password, role, tenantId) {
   return request({
     url: '/auth/login',
     method: 'POST',
-    data: { username, password, role }
+    data: { username, password, role, tenantId }
   });
 }
 
@@ -83,12 +147,36 @@ function register(userData) {
   });
 }
 
-// 微信快捷登录（后端需要新增接口）
-function wechatLogin(code, encryptedData, iv) {
+// 微信登录
+function wechatLogin(code, tenantId) {
   return request({
     url: '/auth/wechat-login',
     method: 'POST',
-    data: { code, encryptedData, iv }
+    data: { code, tenantId }
+  });
+}
+
+function bindWechatPhone(code) {
+  return request({
+    url: '/auth/wechat-phone',
+    method: 'POST',
+    data: { code }
+  });
+}
+
+function sendSmsCode(phone) {
+  return request({
+    url: '/auth/sms/send-code',
+    method: 'POST',
+    data: { phone }
+  });
+}
+
+function bindPhoneBySms(phone, code) {
+  return request({
+    url: '/auth/sms/bind-phone',
+    method: 'POST',
+    data: { phone, code }
   });
 }
 
@@ -128,12 +216,30 @@ function getCaseDetail(caseId) {
   });
 }
 
-// 提交案件申请
+// 提交调解申请
 function submitCase(caseData) {
   return request({
-    url: '/case',
+    // 当前后端“申请调解”走 /application，而不是 /case
+    url: '/application',
     method: 'POST',
     data: caseData
+  });
+}
+
+function getCurrentDutyMediator(tenantId) {
+  return request({
+    url: '/application/duty-mediator',
+    method: 'GET',
+    data: { tenantId },
+    skipAuthRedirect: true
+  });
+}
+
+function createConsultation(data) {
+  return request({
+    url: '/application/consultation',
+    method: 'POST',
+    data
   });
 }
 
@@ -165,11 +271,11 @@ function getMessages(params = {}) {
   });
 }
 
-function sendMessage(caseId, content) {
+function sendMessage(caseId, content, recipientId) {
   return request({
     url: '/message',
     method: 'POST',
-    data: { caseId, content }
+    data: { caseId, content, recipientId }
   });
 }
 
@@ -178,6 +284,37 @@ function sendMessage(caseId, content) {
 function getBroadcasts() {
   return request({
     url: '/broadcast',
+    method: 'GET',
+    skipAuthRedirect: true
+  });
+}
+
+function getSystemSettings() {
+  return request({
+    url: '/system/settings',
+    method: 'GET',
+    skipAuthRedirect: true
+  });
+}
+
+function getTenants() {
+  return request({
+    url: '/tenant',
+    method: 'GET'
+  });
+}
+
+function createFeedback(data) {
+  return request({
+    url: '/feedback',
+    method: 'POST',
+    data
+  });
+}
+
+function getMyFeedbacks() {
+  return request({
+    url: '/feedback/mine',
     method: 'GET'
   });
 }
@@ -188,7 +325,8 @@ function uploadEvidence(filePath, caseId) {
   return new Promise((resolve, reject) => {
     const token = getToken();
     wx.uploadFile({
-      url: getBaseUrl() + '/evidence/upload',
+      // 后端上传接口为 POST /evidence
+      url: getBaseUrl() + '/evidence',
       filePath: filePath,
       name: 'file',
       header: {
@@ -212,9 +350,10 @@ function uploadEvidence(filePath, caseId) {
 
 function getEvidences(caseId) {
   return request({
-    url: '/evidence',
+    // 后端查询案件证据接口为 GET /evidence/case/:caseId
+    url: '/evidence/case/' + caseId,
     method: 'GET',
-    data: { caseId }
+    data: {}
   });
 }
 
@@ -225,6 +364,33 @@ function updateProfile(data) {
     url: '/auth/profile',
     method: 'PUT',
     data: data
+  });
+}
+
+function uploadAvatar(filePath) {
+  return new Promise((resolve, reject) => {
+    const token = getToken();
+    wx.uploadFile({
+      url: getBaseUrl() + '/auth/avatar',
+      filePath,
+      name: 'avatar',
+      header: {
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      },
+      success: (res) => {
+        try {
+          const data = JSON.parse(res.data);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data);
+          } else {
+            reject(data);
+          }
+        } catch (e) {
+          reject({ message: '头像上传失败' });
+        }
+      },
+      fail: () => reject({ message: '网络连接失败，请检查网络设置' })
+    });
   });
 }
 
@@ -250,19 +416,29 @@ module.exports = {
   login,
   register,
   wechatLogin,
+  bindWechatPhone,
+  sendSmsCode,
+  bindPhoneBySms,
   getCurrentUser,
   getMyCases,
   getCases,
   getCaseDetail,
   submitCase,
+  getCurrentDutyMediator,
+  createConsultation,
   updateCase,
   getCaseProgress,
   getMessages,
   sendMessage,
   getBroadcasts,
+  getSystemSettings,
+  getTenants,
+  createFeedback,
+  getMyFeedbacks,
   uploadEvidence,
   getEvidences,
   updateProfile,
+  uploadAvatar,
   changePassword,
   checkHealth
 };

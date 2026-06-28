@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Card, Descriptions, Timeline, Select, Button, Input, message, Modal, Progress, Tag, Badge, Typography, Checkbox, List, Upload } from 'antd';
+import { Card, Descriptions, Timeline, Select, Button, Input, message, Modal, Progress, Tag, Badge, Typography, Checkbox, List, Upload, Row, Col, Space, Avatar, Statistic, Alert, Empty } from 'antd';
 
 // 获取API基础URL
 const getApiBaseUrl = () => {
@@ -11,17 +11,20 @@ const getApiBaseUrl = () => {
   return baseUrl;
 };
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, FileTextOutlined, UserOutlined, PhoneOutlined, DollarOutlined, CalendarOutlined, MessageOutlined, UploadOutlined, VideoCameraOutlined, EditOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 import FileUpload from '../components/business/FileUpload';
+import { PageHero, PageMetricGrid, PageMetricItem, PageSectionCard, PageShell } from '../components/common/PageKit';
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 interface Case {
   _id: string;
+  tenantId?: string;
+  tenantName?: string;
   caseNumber: string;
   applicantId: {
     name: string;
@@ -53,6 +56,21 @@ interface Progress {
   createdAt: string;
 }
 
+interface CaseMessage {
+  id?: string;
+  _id?: string;
+  senderId?: string;
+  receiverId?: string;
+  senderName?: string;
+  receiverName?: string;
+  content: string;
+  type?: string;
+  caseId?: string;
+  caseNumber?: string;
+  isRead?: boolean;
+  createdAt: string;
+}
+
 const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { userInfo } = useAuthStore();
@@ -67,6 +85,9 @@ const CaseDetail: React.FC = () => {
   const [mediators, setMediators] = useState<any[]>([]);
   const [selectedMediator, setSelectedMediator] = useState('');
   const [mediatorLoading, setMediatorLoading] = useState(false);
+  const [caseMessages, setCaseMessages] = useState<CaseMessage[]>([]);
+  const [caseMessageLoading, setCaseMessageLoading] = useState(false);
+  const [caseMessageContent, setCaseMessageContent] = useState('');
   
   // 案件阶段状态
   const [stages, setStages] = useState({
@@ -158,6 +179,53 @@ const CaseDetail: React.FC = () => {
   
   // AI分析报告模态框状态
   const [AIAnalysisModalVisible, setAIAnalysisModalVisible] = useState(false);
+  const [requestDetailVisible, setRequestDetailVisible] = useState(false);
+
+  const getCurrentMediatorName = () => {
+    if (!caseData) return '未分配';
+    return (
+      (caseData as any).mediatorInfo?.name ||
+      (caseData as any).mediatorName ||
+      (caseData as any).mediatorId?.name ||
+      '未分配'
+    );
+  };
+
+  const getTenantDisplayName = () => {
+    if (!caseData) return '未分配街道';
+    return (
+      (caseData as any).tenantName ||
+      (caseData as any).streetName ||
+      (caseData as any).districtName ||
+      '未分配街道'
+    );
+  };
+
+  const normalizeProgressContent = (content?: string) => {
+    if (!content) return '';
+    return content
+      .replace(/案件状态更新为processing/g, '案件状态更新为处理中')
+      .replace(/案件状态更新为pending/g, '案件状态更新为待处理')
+      .replace(/案件状态更新为completed/g, '案件状态更新为已完成')
+      .replace(/案件状态更新为failed/g, '案件状态更新为失败');
+  };
+
+  const normalizeScheduleDate = (rawDate: string) => {
+    const value = (rawDate || '').trim();
+    let match = value.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) {
+      const [, month, day, year] = match;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    return value;
+  };
 
   const fetchEvidence = async () => {
     if (!id) return;
@@ -300,9 +368,25 @@ const CaseDetail: React.FC = () => {
     }
   };
 
+  const fetchCaseMessages = async () => {
+    if (!id) return;
+
+    setCaseMessageLoading(true);
+    try {
+      const response = await api.get('/message', { params: { caseId: id, limit: 100 } });
+      setCaseMessages(response.data.messages || []);
+    } catch (error) {
+      message.error('获取案件留言失败');
+      setCaseMessages([]);
+    } finally {
+      setCaseMessageLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchCaseDetail();
     fetchCaseReminderDays();
+    fetchCaseMessages();
   }, [id]);
   
   useEffect(() => {
@@ -330,13 +414,80 @@ const CaseDetail: React.FC = () => {
   };
 
   // 获取调解员列表
+  const getMediatorOptionId = (mediator: any) => mediator?.id || mediator?._id || '';
+  const getMediatorOptionLabel = (mediator: any) => {
+    const name = mediator?.name || mediator?.username || '未命名调解员';
+    const phone = mediator?.phone || mediator?.officePhone || '';
+    return phone ? `${name} (${phone})` : name;
+  };
+
+  const getParticipantId = (participant: any) => {
+    if (!participant) return '';
+    if (typeof participant === 'string') return participant;
+    return participant.id || participant._id || '';
+  };
+
+  const getCaseMessageId = (item: CaseMessage) => item.id || item._id || '';
+  const getCaseMessageSenderId = (item: CaseMessage) => item.senderId || '';
+  const getCaseMessageSenderName = (item: CaseMessage) => {
+    if (getCaseMessageSenderId(item) === userInfo?.id) return '我';
+    return item.senderName || '未知用户';
+  };
+
+  const resolveCaseMessageRecipientId = () => {
+    const latestExternalMessage = [...caseMessages].reverse().find(item => getCaseMessageSenderId(item) && getCaseMessageSenderId(item) !== userInfo?.id);
+    if (latestExternalMessage) return getCaseMessageSenderId(latestExternalMessage);
+
+    const applicantId = getParticipantId((caseData as any)?.applicantId);
+    const respondentId = getParticipantId((caseData as any)?.respondentId);
+    return [applicantId, respondentId].find(item => item && item !== userInfo?.id) || '';
+  };
+
+  const handleSendCaseMessage = async () => {
+    if (!id || !caseMessageContent.trim()) {
+      message.warning('请输入留言内容');
+      return;
+    }
+
+    const recipientId = resolveCaseMessageRecipientId();
+    if (!recipientId) {
+      message.warning('未找到留言接收方');
+      return;
+    }
+
+    setCaseMessageLoading(true);
+    try {
+      await api.post('/message', {
+        caseId: id,
+        recipientId,
+        content: caseMessageContent.trim(),
+        type: 'case_message'
+      });
+      message.success('回复成功');
+      setCaseMessageContent('');
+      await fetchCaseMessages();
+    } catch (error) {
+      message.error('回复失败');
+    } finally {
+      setCaseMessageLoading(false);
+    }
+  };
+
   const fetchMediators = async () => {
     setMediatorLoading(true);
     try {
-      const response = await api.get('/auth/users', { params: { role: 'mediator' } });
-      setMediators(response.data.users || []);
+      const response = await api.get('/auth/users', {
+        params: {
+          role: 'mediator',
+          ...(caseData?.tenantId ? { tenantId: caseData.tenantId } : {})
+        }
+      });
+      const users = response.data.users || [];
+      setMediators(users);
+      return users;
     } catch (error) {
       message.error('获取调解员列表失败');
+      return [];
     } finally {
       setMediatorLoading(false);
     }
@@ -344,11 +495,14 @@ const CaseDetail: React.FC = () => {
 
   // 打开分配调解员模态框
   const openMediatorModal = async () => {
-    await fetchMediators();
-    // 只有当mediatorId有_id属性且该ID在调解员列表中存在时才设置selectedMediator
-    const currentMediatorId = caseData?.mediatorId?._id;
+    const mediatorList = await fetchMediators();
+    const currentMediatorId =
+      (caseData?.mediatorId as any)?.id ||
+      (caseData?.mediatorId as any)?._id ||
+      (typeof caseData?.mediatorId === 'string' ? caseData.mediatorId : '') ||
+      '';
     if (currentMediatorId) {
-      const mediatorExists = mediators.some(mediator => mediator._id === currentMediatorId);
+      const mediatorExists = mediatorList.some((mediator: any) => getMediatorOptionId(mediator) === currentMediatorId);
       setSelectedMediator(mediatorExists ? currentMediatorId : '');
     } else {
       setSelectedMediator('');
@@ -492,8 +646,9 @@ const CaseDetail: React.FC = () => {
   const handleAddSchedule = async (date: string) => {
     setLoading(true);
     try {
+      const normalizedDate = normalizeScheduleDate(date);
       await api.post(`/case/${id}/schedule`, {
-        date,
+        date: normalizedDate,
         caseId: id,
         category: selectedCategory
       });
@@ -569,6 +724,8 @@ const CaseDetail: React.FC = () => {
   const completedStages = Object.values(stages).filter(stage => stage.completed).length;
   const totalStages = Object.values(stages).length;
   const overallProgress = (completedStages / totalStages) * 100;
+  const mediationProgressCount = progress.filter((item) => item.type === 'mediate').length;
+  const isInternalRole = ['mediator', 'tenant_admin', 'superadmin'].includes(userInfo?.role || '');
 
   // 获取阶段图标
   const getStageIcon = (stage: string, completed: boolean) => {
@@ -592,44 +749,48 @@ const CaseDetail: React.FC = () => {
 
 
   return (
-    <div style={{ backgroundColor: 'white', padding: 24, borderRadius: 8 }}>
-      {/* 页面标题和操作按钮 */}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h2>案件详情 - {caseData.caseNumber}</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button type="primary" ghost onClick={handleExportFile}>
+    <PageShell>
+      <PageHero
+        tone="blue"
+        icon={<FileTextOutlined />}
+        title={`案件详情 · ${caseData.caseNumber}`}
+        description="围绕案件进度、关键信息、证据与沟通记录组织展示，方便承办人连续处理，也方便申请人查看状态变化。"
+        tags={
+          <>
+            <Tag color="blue-inverse" style={{ borderRadius: 999 }}>{getStatusText(caseData.status)}</Tag>
+            <Tag color="geekblue-inverse" style={{ borderRadius: 999 }}>{getTenantDisplayName()}</Tag>
+            <Tag color="cyan-inverse" style={{ borderRadius: 999 }}>调解员：{getCurrentMediatorName()}</Tag>
+          </>
+        }
+        actions={
+          <Space wrap>
+            <Button type="primary" onClick={handleExportFile} style={{ background: '#ffffff', color: '#1677ff', borderColor: '#ffffff', fontWeight: 600 }}>
               <FileTextOutlined /> 导出卷宗
             </Button>
-            <Button type="primary" onClick={handleAIAnalysis}>
-              AI分析报告
-            </Button>
-          </div>
-        </div>
-        <div>
-          {(userInfo?.role === 'mediator' || userInfo?.role === 'admin') && (
-            <Button type="primary" onClick={() => setStatusModalVisible(true)} style={{ marginRight: 8 }}>
-              更新状态
-            </Button>
-          )}
-          {userInfo?.role === 'admin' && (
-            <Button type="default" onClick={openMediatorModal} style={{ marginRight: 8 }}>
-              分配调解员
-            </Button>
-          )}
-          {(userInfo?.role === 'mediator' || userInfo?.role === 'admin') && (
-            <Button type="default" onClick={() => setMeetingModalVisible(true)} style={{ marginRight: 8 }}>
-              <VideoCameraOutlined /> 调解会议
-            </Button>
-          )}
-        </div>
-      </div>
+            {isInternalRole && (
+              <Button onClick={() => setStatusModalVisible(true)}>
+                更新状态
+              </Button>
+            )}
+            {(['tenant_admin', 'superadmin'].includes(userInfo?.role || '')) && (
+              <Button onClick={openMediatorModal}>
+                分配调解员
+              </Button>
+            )}
+          </Space>
+        }
+      />
 
-      {/* 页面主体内容 - 左右布局 */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 24 }}>
-        {/* 左侧：案件时间轴 */}
-        <div style={{ flex: 1, minWidth: 500 }}>
-          <Card title="案件时间轴" style={{ marginBottom: 24 }}>
+      <PageMetricGrid>
+        <PageMetricItem><Statistic title="阶段完成度" value={Math.round(overallProgress)} suffix="%" /></PageMetricItem>
+        <PageMetricItem><Statistic title="调解记录" value={mediationProgressCount} suffix="条" /></PageMetricItem>
+        <PageMetricItem><Statistic title="证据材料" value={evidence.length} suffix="份" /></PageMetricItem>
+        <PageMetricItem><Statistic title="案件留言" value={caseMessages.length} suffix="条" /></PageMetricItem>
+      </PageMetricGrid>
+
+      <div style={{ display: 'flex', gap: 24, marginBottom: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 520 }}>
+          <PageSectionCard title="案件时间轴">
             <Timeline
               mode="left"
             >
@@ -652,7 +813,7 @@ const CaseDetail: React.FC = () => {
                     <h4 style={{ margin: 0 }}>案件受理</h4>
                   </div>
                   <p style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
-                    受理人：{caseData?.mediatorId?.name || '未分配'}
+                    受理人：{getCurrentMediatorName()}
                   </p>
                 </div>
               </Timeline.Item>
@@ -667,7 +828,7 @@ const CaseDetail: React.FC = () => {
                     <div>
                       {progress.filter(p => p.type === 'mediate').map((item) => (
                         <div key={item._id} style={{ marginBottom: 8, paddingLeft: 16, borderLeft: '2px solid #e8e8e8' }}>
-                          <p style={{ margin: 0, marginBottom: 4 }}>{item.content}</p>
+                          <p style={{ margin: 0, marginBottom: 4 }}>{normalizeProgressContent(item.content)}</p>
                           <p style={{ fontSize: 12, color: '#999', margin: 0 }}>
                             {item.creatorId?.name || '未知'} · {new Date(item.createdAt).toLocaleString()}
                           </p>
@@ -712,40 +873,122 @@ const CaseDetail: React.FC = () => {
                 </div>
               </Timeline.Item>
             </Timeline>
-          </Card>
+          </PageSectionCard>
+
+          <div style={{ marginTop: 24 }}>
+            <PageSectionCard title="案件留言">
+              <List
+                loading={caseMessageLoading}
+                locale={{ emptyText: '当前案件暂无留言记录' }}
+                dataSource={caseMessages}
+                renderItem={(item) => {
+                  const isMine = getCaseMessageSenderId(item) === userInfo?.id;
+                  return (
+                    <List.Item key={getCaseMessageId(item)}>
+                      <div style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontWeight: 600, color: isMine ? '#1677ff' : '#262626' }}>
+                            {getCaseMessageSenderName(item)}
+                          </span>
+                          <span style={{ fontSize: 12, color: '#999' }}>
+                            {new Date(item.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            background: isMine ? '#e6f4ff' : '#f5f5f5',
+                            borderRadius: 8,
+                            padding: '10px 12px',
+                            lineHeight: 1.7
+                          }}
+                        >
+                          {item.content}
+                        </div>
+                      </div>
+                    </List.Item>
+                  );
+                }}
+              />
+
+              {(['superadmin', 'tenant_admin', 'mediator'].includes(userInfo?.role || '')) && (
+                <div style={{ marginTop: 16 }}>
+                  <TextArea
+                    rows={4}
+                    value={caseMessageContent}
+                    onChange={(e) => setCaseMessageContent(e.target.value)}
+                    placeholder="请输入给当事人的回复内容"
+                  />
+                  <div style={{ textAlign: 'right', marginTop: 12 }}>
+                    <Button type="primary" icon={<MessageOutlined />} loading={caseMessageLoading} onClick={handleSendCaseMessage}>
+                      发送回复
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </PageSectionCard>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <PageSectionCard title="记一笔">
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <Button type="dashed" icon={<UploadOutlined />} onClick={() => setNoteModalVisible(true)}>
+                    文件识别
+                  </Button>
+                  <Button type="dashed" icon={<CalendarOutlined />} onClick={handleScheduleReminder}>
+                    日程提醒
+                  </Button>
+                </div>
+                <TextArea
+                  rows={4}
+                  value={quickNote}
+                  onChange={(e) => setQuickNote(e.target.value)}
+                  placeholder="请快速记录调解过程中的关键信息..."
+                />
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <Button type="primary" onClick={handleQuickNote}>
+                  保存记录
+                </Button>
+              </div>
+            </PageSectionCard>
+          </div>
         </div>
 
-        {/* 右侧：案件信息和重要提醒 */}
         <div style={{ width: 400, flexShrink: 0 }}>
-          {/* 案件基本信息 */}
-          <Card title="案件基本信息" style={{ marginBottom: 24 }}>
+          <PageSectionCard title="案件基本信息">
             <Descriptions column={1}>
               <Descriptions.Item label={<><FileTextOutlined /> 案件编号</>}>{caseData.caseNumber}</Descriptions.Item>
+              <Descriptions.Item label={<><CalendarOutlined /> 归属街道</>}>{getTenantDisplayName()}</Descriptions.Item>
               <Descriptions.Item label={<><ClockCircleOutlined /> 状态</>}>
                 <Badge status={caseData.status === 'completed' ? 'success' : caseData.status === 'processing' ? 'processing' : 'default'} text={getStatusText(caseData.status)} />
               </Descriptions.Item>
-              <Descriptions.Item label={<><UserOutlined /> 申请人</>}>{caseData.applicantId?.name || '未知'} ({caseData.applicantId?.phone || '未知'})</Descriptions.Item>
-              <Descriptions.Item label={<><UserOutlined /> 被申请人</>}>{caseData.respondentId?.name || '未知'} ({caseData.respondentId?.phone || '未知'})</Descriptions.Item>
+              <Descriptions.Item label={<><UserOutlined /> 申请人</>}>
+                {(caseData.applicantInfo?.name || caseData.applicantDisplayName || caseData.applicantName || caseData.applicantId?.name || '未知')}
+                {' '}({caseData.applicantPhone || caseData.applicantInfo?.phone || caseData.applicantId?.phone || '未知'})
+              </Descriptions.Item>
+              <Descriptions.Item label={<><UserOutlined /> 被申请人</>}>
+                {(caseData.respondentInfo?.name || caseData.respondentDisplayName || caseData.respondentName || caseData.respondentId?.name || '未知')}
+                {' '}({caseData.respondentPhone || caseData.respondentInfo?.phone || caseData.respondentId?.phone || '未知'})
+              </Descriptions.Item>
               <Descriptions.Item label={<><ExclamationCircleOutlined /> 争议类型</>}>{caseData.disputeType}</Descriptions.Item>
               <Descriptions.Item label={<><DollarOutlined /> 涉案金额</>}>¥{caseData.caseAmount || 0}</Descriptions.Item>
-              <Descriptions.Item label={<><UserOutlined /> 调解员</>}>{caseData.mediatorId?.name || '未分配'}</Descriptions.Item>
+              <Descriptions.Item label={<><UserOutlined /> 调解员</>}>{getCurrentMediatorName()}</Descriptions.Item>
               <Descriptions.Item label={<><CalendarOutlined /> 创建时间</>}>{new Date(caseData.createdAt).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label={<><CalendarOutlined /> 结案时间</>}>{caseData.closeTime ? new Date(caseData.closeTime).toLocaleString() : '未结案'}</Descriptions.Item>
             </Descriptions>
-          </Card>
+          </PageSectionCard>
 
-          {/* 调解请求 */}
-          <Card title="调解请求" style={{ marginBottom: 24 }}>
+          <PageSectionCard title="调解请求">
             <div style={{ marginBottom: 16 }}>
-              <p style={{ marginBottom: 8 }}>{caseData.requestItems}</p>
-              <Button type="link">查看详细请求</Button>
+              <p style={{ marginBottom: 8 }}>{caseData.requestItems || '暂无调解请求'}</p>
+              <Button type="link" onClick={() => setRequestDetailVisible(true)}>查看详细请求</Button>
             </div>
-          </Card>
+          </PageSectionCard>
 
-          {/* 重要提醒 */}
-          <Card title="重要提醒" style={{ marginBottom: 24, borderLeft: '4px solid #faad14' }}>
+          <PageSectionCard title="重要提醒">
             {caseData.status === 'pending' && (
-              <div style={{ backgroundColor: '#fffbe6', padding: 12, borderRadius: 4, marginBottom: 16 }}>
+              <div style={{ backgroundColor: '#fffbe6', padding: 14, borderRadius: 12, marginBottom: 16 }}>
                 <p style={{ marginBottom: 8, fontWeight: 'bold' }}>调解意愿确认</p>
                 <p style={{ marginBottom: 12 }}>案件状态为待处理，需确认双方调解意愿</p>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -758,10 +1001,18 @@ const CaseDetail: React.FC = () => {
                 </div>
               </div>
             )}
-          </Card>
+            {caseData.status !== 'pending' && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ borderRadius: 12 }}
+                message="当前无强提醒事项"
+                description="该案件目前没有需要立即确认的强提醒，你仍可通过状态更新、记一笔和会议记录保持案件连续推进。"
+              />
+            )}
+          </PageSectionCard>
 
-          {/* 证据材料 */}
-          <Card title="证据材料" style={{ marginBottom: 24 }}>
+          <PageSectionCard title="证据材料">
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>证据列表</h4>
@@ -771,6 +1022,7 @@ const CaseDetail: React.FC = () => {
               </div>
               <List
                 dataSource={evidence}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无证据材料" /> }}
                 renderItem={(item) => (
                   <List.Item>
                     <List.Item.Meta
@@ -782,34 +1034,9 @@ const CaseDetail: React.FC = () => {
                 )}
               />
             </div>
-          </Card>
+          </PageSectionCard>
         </div>
       </div>
-
-      {/* 底部：记一笔功能 */}
-      <Card title="记一笔" style={{ marginBottom: 24 }}>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <Button type="dashed" icon={<UploadOutlined />} onClick={() => setNoteModalVisible(true)}>
-              文件识别
-            </Button>
-            <Button type="dashed" icon={<CalendarOutlined />} onClick={handleScheduleReminder}>
-              日程提醒
-            </Button>
-          </div>
-          <TextArea
-            rows={4}
-            value={quickNote}
-            onChange={(e) => setQuickNote(e.target.value)}
-            placeholder="请快速记录调解过程中的关键信息..."
-          />
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <Button type="primary" onClick={handleQuickNote}>
-            保存记录
-          </Button>
-        </div>
-      </Card>
 
       <Modal
         title="更新案件状态"
@@ -844,6 +1071,29 @@ const CaseDetail: React.FC = () => {
       </Modal>
 
       <Modal
+        title="调解请求详情"
+        open={requestDetailVisible}
+        onCancel={() => setRequestDetailVisible(false)}
+        footer={null}
+        width={720}
+      >
+        <div style={{ display: 'grid', gap: 16 }}>
+          <Card size="small" bordered={false} style={{ borderRadius: 12, background: '#f8fbff' }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>调解请求</div>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+              {caseData?.requestItems || '暂无调解请求'}
+            </div>
+          </Card>
+          <Card size="small" bordered={false} style={{ borderRadius: 12, background: '#fafafa' }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>事实与理由</div>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+              {caseData?.factsReasons || '暂无补充说明'}
+            </div>
+          </Card>
+        </div>
+      </Modal>
+
+      <Modal
         title="分配调解员"
         open={mediatorModalVisible}
         onOk={handleAssignMediator}
@@ -858,17 +1108,23 @@ const CaseDetail: React.FC = () => {
             onChange={setSelectedMediator}
             placeholder="请选择调解员"
             loading={mediatorLoading}
+            optionFilterProp="label"
+            showSearch
           >
             {mediators.map((mediator) => (
-              <Option key={mediator._id} value={mediator._id}>
-                {mediator.name} ({mediator.phone})
+              <Option
+                key={getMediatorOptionId(mediator)}
+                value={getMediatorOptionId(mediator)}
+                label={getMediatorOptionLabel(mediator)}
+              >
+                {getMediatorOptionLabel(mediator)}
               </Option>
             ))}
           </Select>
         </div>
         <div>
           <p style={{ color: '#666' }}>
-            当前调解员：{caseData?.mediatorId?.name || '未分配'}
+            当前调解员：{getCurrentMediatorName()}
           </p>
         </div>
       </Modal>
@@ -900,8 +1156,7 @@ const CaseDetail: React.FC = () => {
             onChange={setNotificationType}
             options={[
               { value: 'system', label: '站内消息' },
-              { value: 'popup', label: '弹窗提醒' },
-              { value: 'sms', label: '短信提醒' }
+              { value: 'popup', label: '弹窗提醒' }
             ]}
           />
         </div>
@@ -1094,8 +1349,8 @@ const CaseDetail: React.FC = () => {
           <div style={{ marginBottom: 16, padding: 12, backgroundColor: '#e6f7ff', borderRadius: 4 }}>
             <p style={{ marginBottom: 8 }}>案件信息：</p>
             <p>案件编号：{caseData?.caseNumber}</p>
-            <p>申请人：{caseData?.applicantId?.name}</p>
-            <p>被申请人：{caseData?.respondentId?.name}</p>
+            <p>申请人：{caseData?.applicantInfo?.name || caseData?.applicantDisplayName || caseData?.applicantName || caseData?.applicantId?.name}</p>
+            <p>被申请人：{caseData?.respondentInfo?.name || caseData?.respondentDisplayName || caseData?.respondentName || caseData?.respondentId?.name}</p>
             <p>争议类型：{caseData?.disputeType}</p>
           </div>
         </div>
@@ -1134,7 +1389,7 @@ const CaseDetail: React.FC = () => {
             <div>
               {progress.filter(item => item.type === 'register').map((item, index) => (
                 <div key={index} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                  <p style={{ marginBottom: 4 }}>{item.content}</p>
+                  <p style={{ marginBottom: 4 }}>{normalizeProgressContent(item.content)}</p>
                   <p style={{ fontSize: 12, color: '#999' }}>
                     {item.creatorId?.name || '未知'} · {new Date(item.createdAt).toLocaleString()}
                   </p>
@@ -1146,7 +1401,7 @@ const CaseDetail: React.FC = () => {
             <div>
               {progress.filter(item => item.type === 'accept').map((item, index) => (
                 <div key={index} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                  <p style={{ marginBottom: 4 }}>{item.content}</p>
+                  <p style={{ marginBottom: 4 }}>{normalizeProgressContent(item.content)}</p>
                   <p style={{ fontSize: 12, color: '#999' }}>
                     {item.creatorId?.name || '未知'} · {new Date(item.createdAt).toLocaleString()}
                   </p>
@@ -1158,7 +1413,7 @@ const CaseDetail: React.FC = () => {
             <div>
               {progress.filter(item => item.type === 'mediate').map((item, index) => (
                 <div key={index} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                  <p style={{ marginBottom: 4 }}>{item.content}</p>
+                  <p style={{ marginBottom: 4 }}>{normalizeProgressContent(item.content)}</p>
                   <p style={{ fontSize: 12, color: '#999' }}>
                     {item.creatorId?.name || '未知'} · {new Date(item.createdAt).toLocaleString()}
                   </p>
@@ -1170,7 +1425,7 @@ const CaseDetail: React.FC = () => {
             <div>
               {progress.filter(item => item.type === 'close').map((item, index) => (
                 <div key={index} style={{ marginBottom: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                  <p style={{ marginBottom: 4 }}>{item.content}</p>
+                  <p style={{ marginBottom: 4 }}>{normalizeProgressContent(item.content)}</p>
                   <p style={{ fontSize: 12, color: '#999' }}>
                     {item.creatorId?.name || '未知'} · {new Date(item.createdAt).toLocaleString()}
                   </p>
@@ -1287,7 +1542,7 @@ const CaseDetail: React.FC = () => {
           </Button>
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 };
 

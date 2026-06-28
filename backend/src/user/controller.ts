@@ -60,7 +60,7 @@ export const updateUser = [
   async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
-      const { name, phone, email, address, role } = req.body;
+      const { name, phone, address, role } = req.body;
 
       const user = await userRepository.findById(id);
       if (!user) {
@@ -71,7 +71,6 @@ export const updateUser = [
       const updateData: any = {};
       if (name) updateData.name = name;
       if (phone) updateData.phone = phone;
-      if (email) updateData.email = email;
       if (address) updateData.address = address;
       if (role && req.user?.role === 'admin') updateData.role = role;
 
@@ -118,7 +117,7 @@ export const createUser = [
   auth,
   async (req: express.Request, res: express.Response) => {
     try {
-      const { username, password, name, phone, email, address, role } = req.body;
+      const { username, password, name, phone, address, role } = req.body;
 
       // 检查用户名是否已存在
       const existingUser = await userRepository.findByUsername(username);
@@ -132,7 +131,7 @@ export const createUser = [
         password, // 密码会在模型中自动加密
         name,
         phone,
-        email,
+        email: `${username}_${Date.now()}@example.com`,
         address,
         role
       } as any);
@@ -223,9 +222,7 @@ export const getReminderSetting = [
         userId,
         reminderTime: '30min',
         notificationChannels: {
-          system: true,
-          email: true,
-          sms: false
+          system: true
         },
         workdayOnly: true,
         caseReminderDays: 15
@@ -233,11 +230,7 @@ export const getReminderSetting = [
       
       // 更新默认值与数据库中的设置
       settings.forEach(s => {
-        if (s.type === 'email') {
-          setting.notificationChannels.email = s.enabled;
-        } else if (s.type === 'sms') {
-          setting.notificationChannels.sms = s.enabled;
-        } else if (s.type === 'in_app') {
+        if (s.type === 'in_app') {
           setting.notificationChannels.system = s.enabled;
         }
       });
@@ -263,12 +256,6 @@ export const updateReminderSetting = [
         if (notificationChannels.system !== undefined) {
           await reminderSettingRepository.upsert(userId!, 'in_app', notificationChannels.system, 15);
         }
-        if (notificationChannels.email !== undefined) {
-          await reminderSettingRepository.upsert(userId!, 'email', notificationChannels.email, 30);
-        }
-        if (notificationChannels.sms !== undefined) {
-          await reminderSettingRepository.upsert(userId!, 'sms', notificationChannels.sms, 30);
-        }
       }
       
       const settings = await reminderSettingRepository.findByUser(userId!);
@@ -278,9 +265,7 @@ export const updateReminderSetting = [
         userId,
         reminderTime: reminderTime || '30min',
         notificationChannels: {
-          system: true,
-          email: true,
-          sms: false
+          system: true
         },
         workdayOnly: workdayOnly !== undefined ? workdayOnly : true,
         caseReminderDays: caseReminderDays || 15
@@ -288,11 +273,7 @@ export const updateReminderSetting = [
       
       // 更新响应对象与数据库中的设置
       settings.forEach(s => {
-        if (s.type === 'email') {
-          setting.notificationChannels.email = s.enabled;
-        } else if (s.type === 'sms') {
-          setting.notificationChannels.sms = s.enabled;
-        } else if (s.type === 'in_app') {
+        if (s.type === 'in_app') {
           setting.notificationChannels.system = s.enabled;
         }
       });

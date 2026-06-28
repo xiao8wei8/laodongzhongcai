@@ -3,6 +3,28 @@ import { v4 as uuidv4 } from 'uuid';
 import broadcastRepository from '../repositories/broadcastRepository';
 import { io } from '../server';
 
+const isInternalRole = (role?: string) => ['superadmin', 'tenant_admin', 'mediator'].includes(role || '');
+
+const canAccessBroadcast = (broadcast: any, userId?: string, userRole?: string, tenantId?: string | null) => {
+  if (userRole === 'superadmin') {
+    return true;
+  }
+
+  if (userRole === 'tenant_admin') {
+    return broadcast.tenantId === tenantId;
+  }
+
+  if (isInternalRole(userRole)) {
+    return broadcast.status === 'approved' || (!!userId && broadcast.creatorId === userId);
+  }
+
+  return broadcast.status === 'approved' && broadcast.type === 'all';
+};
+
+const filterBroadcastsForUser = (broadcasts: any[], userId?: string, userRole?: string, tenantId?: string | null) => {
+  return broadcasts.filter(b => canAccessBroadcast(b, userId, userRole, tenantId));
+};
+
 // 发布广播
 export const createBroadcast = async (req: express.Request, res: express.Response) => {
   try {
@@ -25,6 +47,7 @@ export const createBroadcast = async (req: express.Request, res: express.Respons
       urgency,
       status: 'pending',
       creatorId: req.user?.id as string,
+      tenantId: req.user?.tenantId || null,
       attachments: attachments ? JSON.stringify(attachments) : null,
       expireAt,
     } as any);
@@ -45,23 +68,12 @@ export const getBroadcasts = async (req: express.Request, res: express.Response)
     const { page = 1, limit = 10, type, urgency, status } = req.query;
     const userId = req.user?.id;
     const userRole = req.user?.role;
+    const tenantId = req.user?.tenantId;
 
-    // 根据角色过滤
-    let queryStatus = status as string | undefined;
-    if (userRole !== 'admin' && !status) {
-      // 普通用户可以看到已通过的和自己创建的所有广播
-      // 获取关联数据
-
-      // 手动过滤权限
+    if (userRole !== 'superadmin') {
       const allBroadcasts = await broadcastRepository.findAllWithRelations();
-      let filteredBroadcasts = allBroadcasts;
-      if (userRole !== 'admin') {
-        filteredBroadcasts = allBroadcasts.filter(b => 
-          b.status === 'approved' || (userId && b.creatorId === userId)
-        );
-      }
+      let filteredBroadcasts = filterBroadcastsForUser(allBroadcasts, userId, userRole, tenantId);
 
-      // 应用类型和紧急程度过滤
       if (type) {
         filteredBroadcasts = filteredBroadcasts.filter(b => b.type === type);
       }
@@ -86,7 +98,6 @@ export const getBroadcasts = async (req: express.Request, res: express.Response)
         }
       });
     } else {
-      // 管理员或者有明确状态筛选
       const result = await broadcastRepository.paginateBroadcasts(
         Number(page), Number(limit), type as string, urgency as string, status as string
       );
@@ -111,16 +122,23 @@ export const getBroadcasts = async (req: express.Request, res: express.Response)
 export const getBroadcastById = async (req: express.Request, res: express.Response) => {
   try {
     const broadcastId = req.params.id;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const tenantId = req.user?.tenantId;
     
     const broadcast = await broadcastRepository.findById(broadcastId);
     
     if (!broadcast) {
       return res.status(404).json({ message: '广播不存在' });
     }
+
+    if (!canAccessBroadcast(broadcast, userId, userRole, tenantId)) {
+      return res.status(403).json({ message: '权限不足' });
+    }
     
     // 检查是否需要标记为已读
-    if (broadcast.status === 'approved' && req.user?.id) {
-      await broadcastRepository.markAsRead(broadcastId, req.user.id);
+    if (broadcast.status === 'approved' && userId) {
+      await broadcastRepository.markAsRead(broadcastId, userId);
     }
     
     res.json({ broadcast });
@@ -133,8 +151,11 @@ export const getBroadcastById = async (req: express.Request, res: express.Respon
 // 获取最新广播
 export const getLatestBroadcasts = async (req: express.Request, res: express.Response) => {
   try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const tenantId = req.user?.tenantId;
     const broadcasts = await broadcastRepository.findActiveBroadcastsWithRelations();
-    const latest = broadcasts.slice(0, 5);
+    const latest = filterBroadcastsForUser(broadcasts, userId, userRole, tenantId).slice(0, 5);
     
     // 计算未读数量
     let unreadCount = 0;
@@ -211,9 +232,12 @@ export const approveBroadcast = async (req: express.Request, res: express.Respon
 // 获取待审核广播列表
 export const getPendingBroadcasts = async (req: express.Request, res: express.Response) => {
   try {
-    const broadcasts = await broadcastRepository.findByStatus('pending');
     const withRelations = await broadcastRepository.findAllWithRelations();
-    const pendingWithRelations = withRelations.filter(b => b.status === 'pending');
+    const pendingWithRelations = withRelations.filter(b => {
+      if (b.status !== 'pending') return false;
+      if (req.user?.role === 'superadmin') return true;
+      return b.tenantId === req.user?.tenantId;
+    });
     
     res.json({ broadcasts: pendingWithRelations });
   } catch (error) {
@@ -242,6 +266,10 @@ export const getBroadcastStats = async (req: express.Request, res: express.Respo
       }
     }
     
+    if (req.user?.role === 'tenant_admin' && broadcast.tenantId !== req.user?.tenantId) {
+      return res.status(403).json({ message: '权限不足' });
+    }
+
     const stats = {
       totalRead: readBy.length,
       readers: readBy.map((item: any) => ({

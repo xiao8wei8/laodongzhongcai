@@ -1,13 +1,16 @@
 {
   "pages": [
-    "pages/login/login",
-    "pages/register/register",
     "pages/home/home",
+    "pages/login/login",
+    "pages/agreement/agreement",
+    "pages/register/register",
     "pages/case-apply/case-apply",
+    "pages/consult/consult",
     "pages/my-cases/my-cases",
     "pages/case-detail/case-detail",
     "pages/messages/messages",
-    "pages/profile/profile"
+    "pages/profile/profile",
+    "pages/feedback/feedback"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -24,19 +27,27 @@
     "list": [
       {
         "pagePath": "pages/home/home",
-        "text": "首页"
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-active.png"
       },
       {
         "pagePath": "pages/my-cases/my-cases",
-        "text": "我的案件"
+        "text": "我的案件",
+        "iconPath": "assets/tabbar/cases.png",
+        "selectedIconPath": "assets/tabbar/cases-active.png"
       },
       {
         "pagePath": "pages/messages/messages",
-        "text": "消息"
+        "text": "消息",
+        "iconPath": "assets/tabbar/message.png",
+        "selectedIconPath": "assets/tabbar/message-active.png"
       },
       {
         "pagePath": "pages/profile/profile",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "assets/tabbar/profile.png",
+        "selectedIconPath": "assets/tabbar/profile-active.png"
       }
     ]
   },

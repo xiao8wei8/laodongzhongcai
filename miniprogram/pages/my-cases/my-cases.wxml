@@ -1,4 +1,11 @@
 <view class="cases-container">
+  <view wx:if="{{isGuestMode}}" class="empty-state">
+    <view class="empty-state-icon">🔐</view>
+    <view class="empty-state-text">登录后可查看你的案件</view>
+    <button class="btn-outline btn-sm mt-20" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
   <view class="search-bar card">
     <input class="search-input" placeholder="搜索案件编号/内容..." value="{{keyword}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onSearch" />
     <text class="search-btn" bindtap="onSearch">🔍</text>
@@ -35,5 +42,6 @@
     <button class="btn-outline btn-sm mt-20" bindtap="goApply">申请调解</button>
   </view>
 
-  <view class="fab" bindtap="goApply"><text>＋</text></view>
+  <view wx:if="{{showFab}}" class="fab page-fixed-entrance" bindtap="goApply"><text>＋</text></view>
+  </block>
 </view>

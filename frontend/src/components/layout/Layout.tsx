@@ -5,7 +5,8 @@ import useAuthStore from '../../store/authStore';
 import api from '../../services/api';
 import socketService from '../../services/socketService';
 import { io, Socket } from 'socket.io-client';
-import { DashboardOutlined, FileSearchOutlined, FileAddOutlined, UserAddOutlined, BellOutlined, BarChartOutlined, LogoutOutlined, UserOutlined, SettingOutlined, CalendarOutlined, CheckCircleOutlined, MenuOutlined, BankOutlined, BuildOutlined, TeamOutlined, FileTextOutlined } from '@ant-design/icons';
+import { DashboardOutlined, FileSearchOutlined, FileAddOutlined, UserAddOutlined, BellOutlined, BarChartOutlined, LogoutOutlined, UserOutlined, SettingOutlined, CalendarOutlined, CheckCircleOutlined, MenuOutlined, BankOutlined, BuildOutlined, TeamOutlined, FileTextOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { getRoleLabel, getRoleNavigationMeta } from '../../utils/roleNavigation';
 
 const { Header, Content, Sider } = AntLayout;
 
@@ -131,46 +132,128 @@ const Layout: React.FC = () => {
     return iconMap[systemSettings.systemIcon] || <BankOutlined />;
   };
 
+  const createMenuItem = (path: string, label: string, icon: React.ReactNode) => ({
+    key: path,
+    icon,
+    label: <Link to={path}>{label}</Link>
+  });
+
   // 根据用户角色动态生成菜单项
   const generateMenuItems = () => {
-    const baseItems = [
-      { key: '/dashboard', icon: <DashboardOutlined />, label: <Link to="/dashboard">工作台</Link> },
-      { key: '/case-query', icon: <FileSearchOutlined />, label: <Link to="/case-query">案件查询</Link> }
+    const isSuperAdmin = userInfo?.role === 'superadmin';
+    const isTenantAdmin = userInfo?.role === 'tenant_admin';
+    const isMediator = userInfo?.role === 'mediator';
+    const isInternalUser = ['superadmin', 'tenant_admin', 'mediator'].includes(userInfo?.role || '');
+    const isExternalUser = ['personal', 'company'].includes(userInfo?.role || '');
+
+    if (isExternalUser) {
+      return [
+        {
+          type: 'group' as const,
+          label: '我的服务',
+          children: [
+            createMenuItem('/dashboard', '我的首页', <DashboardOutlined />),
+            createMenuItem('/case-apply', '申请调解', <FileAddOutlined />),
+            createMenuItem('/case-query', '我的案件', <FileSearchOutlined />)
+          ]
+        },
+        {
+          type: 'group' as const,
+          label: '帮助与反馈',
+          children: [
+            createMenuItem('/feedback-center', '意见反馈', <FileTextOutlined />)
+          ]
+        }
+      ];
+    }
+
+    const businessChildren = [
+      createMenuItem('/dashboard', '工作台', <DashboardOutlined />),
+      createMenuItem('/case-query', '案件查询', <FileSearchOutlined />)
     ];
 
-    // 移除个人用户和企业用户的申请调解菜单
-
-    // 调解员和管理员可以登记到访
-    if (userInfo?.role === 'mediator' || userInfo?.role === 'admin') {
-      baseItems.push({ key: '/visitor-register', icon: <UserAddOutlined />, label: <Link to="/visitor-register">到访登记</Link> });
+    if (isInternalUser) {
+      businessChildren.push(createMenuItem('/visitor-register', '到访登记', <UserAddOutlined />));
+      businessChildren.push(createMenuItem('/broadcast', '站内广播', <BellOutlined />));
+      businessChildren.push(createMenuItem('/schedule-management', '日程管理', <CalendarOutlined />));
     }
 
-    // 调解员和管理员可以发布站内广播
-    if (userInfo?.role === 'mediator' || userInfo?.role === 'admin') {
-      baseItems.push({ key: '/broadcast', icon: <BellOutlined />, label: <Link to="/broadcast">站内广播</Link> });
+    const items: any[] = [
+      {
+        type: 'group',
+        label: isMediator ? '我的工作' : '业务中心',
+        children: businessChildren
+      }
+    ];
+
+    if (isMediator) {
+      items.push({
+        type: 'group',
+        label: '支持与复盘',
+        children: [
+          createMenuItem('/mediator-analysis', '办案分析', <BarChartOutlined />),
+          createMenuItem('/feedback-center', '意见反馈', <FileTextOutlined />)
+        ]
+      });
+      return items;
     }
 
-    // 调解员和管理员可以查看数据分析
-    if (userInfo?.role === 'mediator' || userInfo?.role === 'admin') {
-      baseItems.push({ key: '/data-analysis', icon: <BarChartOutlined />, label: <Link to="/data-analysis">数据分析</Link> });
-      baseItems.push({ key: '/schedule-management', icon: <CalendarOutlined />, label: <Link to="/schedule-management">日程管理</Link> });
-      baseItems.push({ key: '/reminder-settings', icon: <SettingOutlined />, label: <Link to="/reminder-settings">提醒设置</Link> });
+    if (isTenantAdmin) {
+      items.push({
+        type: 'group',
+        label: '街道运营',
+        children: [
+          createMenuItem('/user-management', '人员与值班', <UserOutlined />),
+          createMenuItem('/data-analysis', '数据分析', <BarChartOutlined />)
+        ]
+      });
+      items.push({
+        type: 'group',
+        label: '协作支持',
+        children: [
+          createMenuItem('/feedback-center', '意见反馈', <FileTextOutlined />)
+        ]
+      });
+      return items;
     }
 
-    // 管理员可以访问用户管理、系统设置和服务管理
-    if (userInfo?.role === 'admin') {
-      baseItems.push({ key: '/user-management', icon: <UserOutlined />, label: <Link to="/user-management">用户管理</Link> });
-      baseItems.push({ key: '/system-settings', icon: <SettingOutlined />, label: <Link to="/system-settings">系统设置</Link> });
-      baseItems.push({ key: '/service-management', icon: <SettingOutlined />, label: <Link to="/service-management">服务管理</Link> });
-      baseItems.push({ key: '/api-docs', icon: <FileTextOutlined />, label: <Link to="/api-docs">API文档</Link> });
-      baseItems.push({ key: '/monitoring', icon: <BarChartOutlined />, label: <Link to="/monitoring">系统监控</Link> });
-      baseItems.push({ key: '/analytics', icon: <BarChartOutlined />, label: <Link to="/analytics">用户行为分析</Link> });
+    if (isSuperAdmin) {
+      items.push({
+        type: 'group',
+        label: '组织管理',
+        children: [
+          createMenuItem('/user-management', '人员与值班', <UserOutlined />),
+          createMenuItem('/tenant-management', '街道管理', <ApartmentOutlined />)
+        ]
+      });
+      items.push({
+        type: 'group',
+        label: '运营分析',
+        children: [
+          createMenuItem('/data-analysis', '数据分析', <BarChartOutlined />),
+          createMenuItem('/analytics', '用户行为分析', <BarChartOutlined />)
+        ]
+      });
+      items.push({
+        type: 'group',
+        label: '系统管理',
+        children: [
+          createMenuItem('/system-settings', '系统设置', <SettingOutlined />),
+          createMenuItem('/service-management', '服务管理', <BuildOutlined />),
+          createMenuItem('/monitoring', '系统监控', <BarChartOutlined />),
+          createMenuItem('/api-docs', 'API文档', <FileTextOutlined />),
+          createMenuItem('/feedback-center', '意见反馈', <FileTextOutlined />)
+        ]
+      });
+      return items;
     }
 
-    return baseItems;
+    return items;
   };
 
   const menuItems = generateMenuItems();
+  const roleNavigationMeta = getRoleNavigationMeta(userInfo?.role, userInfo?.tenantName);
+  const roleLabel = getRoleLabel(userInfo?.role, userInfo?.tenantName);
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
@@ -215,7 +298,7 @@ const Layout: React.FC = () => {
         {isAuthenticated && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* 只有调解员和管理员可以看到通知按钮 */}
-            {userInfo?.role === 'mediator' || userInfo?.role === 'admin' ? (
+            {['superadmin', 'tenant_admin', 'mediator'].includes(userInfo?.role || '') ? (
               <Button type="text" icon={<BellOutlined />} style={{ color: 'white' }}>
                 <Link to="/message-center">
                   <Badge count={unreadCount} showZero />
@@ -226,7 +309,9 @@ const Layout: React.FC = () => {
             {/* 在大屏幕上显示用户信息和退出按钮 */}
             {!isMobile && (
               <>
-                <span style={{ color: 'white', fontSize: '12px', whiteSpace: 'nowrap' }}>{userInfo?.name} ({userInfo?.role})</span>
+                <span style={{ color: 'white', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                  {userInfo?.name} ({roleLabel})
+                </span>
                 <Button type="text" icon={<LogoutOutlined />} style={{ color: 'white' }} onClick={logout}>
                   退出登录
                 </Button>
@@ -240,7 +325,7 @@ const Layout: React.FC = () => {
                   items: [
                     {
                       key: 'user',
-                      label: <span>{userInfo?.name} ({userInfo?.role})</span>
+                      label: <span>{userInfo?.name} ({roleLabel})</span>
                     },
                     {
                       key: 'logout',
@@ -261,16 +346,33 @@ const Layout: React.FC = () => {
         <AntLayout>
           <Sider 
             width={200} 
-            style={{ backgroundColor: '#f0f2f5' }}
+            style={{ backgroundColor: '#f7f8fa', borderRight: '1px solid #eef1f5' }}
             breakpoint="md"
             collapsedWidth="0"
             onBreakpoint={(broken) => console.log(broken)}
             onCollapse={(collapsed, type) => console.log(collapsed, type)}
           >
+            <div style={{ padding: 12, borderBottom: '1px solid #eef1f5' }}>
+              <div
+                style={{
+                  padding: '12px 12px 10px',
+                  borderRadius: 12,
+                  background: roleNavigationMeta.background,
+                  border: `1px solid ${roleNavigationMeta.accent}22`
+                }}
+              >
+                <div style={{ fontSize: 12, color: roleNavigationMeta.accent, fontWeight: 700, marginBottom: 6 }}>
+                  {roleNavigationMeta.title}
+                </div>
+                <div style={{ fontSize: 12, color: '#5b6475', lineHeight: 1.5 }}>
+                  {roleNavigationMeta.description}
+                </div>
+              </div>
+            </div>
             <Menu
               mode="inline"
               selectedKeys={[location.pathname]}
-              style={{ height: '100%', borderRight: 0 }}
+              style={{ height: '100%', borderRight: 0, backgroundColor: '#f7f8fa', paddingTop: 8 }}
               items={menuItems}
             />
           </Sider>

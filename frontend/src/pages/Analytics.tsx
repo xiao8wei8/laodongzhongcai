@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Spin, message, Typography, Tabs, Select, DatePicker, Row, Col, Statistic } from 'antd';
+import { Card, Button, Spin, message, Typography, Tabs, Select, DatePicker, Row, Col, Statistic, Space, Avatar, Alert, Tag } from 'antd';
 import { ReloadOutlined, BarChartOutlined, LineChartOutlined, ExclamationCircleOutlined, UserOutlined } from '@ant-design/icons';
 import api from '../services/api';
 import * as echarts from 'echarts';
+import { PageHero, PageMetricGrid, PageMetricItem, PageShell, PageSectionCard, PageToolbar } from '../components/common/PageKit';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -302,23 +303,35 @@ const Analytics: React.FC = () => {
   };
 
   return (
-    <div style={{ backgroundColor: 'white', padding: 24, borderRadius: 8 }}>
-      <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <UserOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-          <Title level={2} style={{ margin: 0, fontSize: '18px', whiteSpace: 'nowrap' }}>用户行为分析</Title>
-        </div>
-        <Button 
-          type="primary" 
-          icon={<ReloadOutlined />} 
-          onClick={fetchAnalyticsData}
-          loading={loading}
-        >
-          刷新数据
-        </Button>
-      </div>
+    <PageShell>
+      <PageHero
+        tone="violet"
+        icon={<UserOutlined />}
+        title="用户行为分析台"
+        description="用于观察页面访问、加载性能、错误情况和用户访问路径。适合从产品和运营角度理解系统实际使用情况。"
+        tags={
+          <>
+            <Tag color="blue-inverse" style={{ borderRadius: 999 }}>访问趋势</Tag>
+            <Tag color="geekblue-inverse" style={{ borderRadius: 999 }}>性能与错误</Tag>
+            <Tag color="purple-inverse" style={{ borderRadius: 999 }}>用户路径</Tag>
+          </>
+        }
+        actions={
+          <Button type="primary" icon={<ReloadOutlined />} onClick={fetchAnalyticsData} loading={loading} size="large" style={{ borderRadius: 10 }}>
+            刷新数据
+          </Button>
+        }
+        note={
+          <Alert
+            message="观察建议"
+            description="先看总事件和页面访问，再结合错误统计和加载性能定位影响体验的关键页面。"
+            type="info"
+            showIcon
+          />
+        }
+      />
 
-      <Card style={{ marginBottom: 24 }}>
+      <PageToolbar>
         <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Text>时间范围:</Text>
@@ -342,31 +355,15 @@ const Analytics: React.FC = () => {
             查询
           </Button>
         </div>
-      </Card>
+      </PageToolbar>
 
       {analyticsData && (
-        <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col span={6}>
-            <Card>
-              <Statistic title="总事件数" value={analyticsData.stats.totalEvents} />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic title="页面访问" value={analyticsData.stats.pageViews} />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic title="点击事件" value={analyticsData.stats.clicks} />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card>
-              <Statistic title="错误数" value={analyticsData.stats.errors} />
-            </Card>
-          </Col>
-        </Row>
+        <PageMetricGrid>
+          <PageMetricItem><Statistic title="总事件数" value={analyticsData.stats.totalEvents} /></PageMetricItem>
+          <PageMetricItem><Statistic title="页面访问" value={analyticsData.stats.pageViews} /></PageMetricItem>
+          <PageMetricItem><Statistic title="点击事件" value={analyticsData.stats.clicks} /></PageMetricItem>
+          <PageMetricItem><Statistic title="错误数" value={analyticsData.stats.errors} /></PageMetricItem>
+        </PageMetricGrid>
       )}
 
       <Tabs defaultActiveKey="overview" onChange={handleTabChange}>
@@ -374,12 +371,12 @@ const Analytics: React.FC = () => {
         <TabPane tab={<><BarChartOutlined /> 概览</>} key="overview">
           <Row gutter={16} style={{ marginBottom: 24 }}>
             <Col span={12}>
-              <Card title="页面访问量趋势">
+              <Card title="页面访问量趋势" bordered={false} style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}>
                 <div id="page-views-chart" style={{ width: '100%', height: 300 }}></div>
               </Card>
             </Col>
             <Col span={12}>
-              <Card title="页面加载性能">
+              <Card title="页面加载性能" bordered={false} style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}>
                 <div id="performance-chart" style={{ width: '100%', height: 300 }}></div>
               </Card>
             </Col>
@@ -388,10 +385,10 @@ const Analytics: React.FC = () => {
 
         {/* 页面统计 */}
         <TabPane tab={<><LineChartOutlined /> 页面统计</>} key="page-stats">
-          <Card>
+          <Card bordered={false} style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               {pageStats.map((page, index) => (
-                <Card key={index} bordered>
+                <Card key={index} bordered={false} style={{ borderRadius: 16, background: '#fafcff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text strong>{page._id}</Text>
                     <Text style={{ color: '#1890ff' }}>{page.count} 次访问</Text>
@@ -407,10 +404,10 @@ const Analytics: React.FC = () => {
 
         {/* 错误统计 */}
         <TabPane tab={<><ExclamationCircleOutlined /> 错误统计</>} key="error-stats">
-          <Card>
+          <Card bordered={false} style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               {errorStats.map((error, index) => (
-                <Card key={index} bordered>
+                <Card key={index} bordered={false} style={{ borderRadius: 16, background: '#fff7f7' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text strong style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {error._id}
@@ -428,7 +425,7 @@ const Analytics: React.FC = () => {
 
         {/* 用户行为 */}
         <TabPane tab={<><UserOutlined /> 用户行为</>} key="user-behavior">
-          <Card>
+          <Card bordered={false} style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}>
             <div style={{ marginBottom: 24 }}>
               <Text strong>用户行为分析</Text>
               <p>以下是用户在系统中的行为模式分析：</p>
@@ -436,20 +433,20 @@ const Analytics: React.FC = () => {
             
             <Row gutter={16} style={{ marginBottom: 24 }}>
               <Col span={12}>
-                <Card title="用户路径分析">
+                <Card title="用户路径分析" bordered={false} style={{ borderRadius: 18 }}>
                   <div id="user-path-chart" style={{ width: '100%', height: 300 }}></div>
                 </Card>
               </Col>
               <Col span={12}>
-                <Card title="用户停留时间">
+                <Card title="用户停留时间" bordered={false} style={{ borderRadius: 18 }}>
                   <div id="time-spent-chart" style={{ width: '100%', height: 300 }}></div>
                 </Card>
               </Col>
             </Row>
             
-            <Card title="用户会话分析">
+            <Card title="用户会话分析" bordered={false} style={{ borderRadius: 18 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-                <Card bordered>
+                <Card bordered={false} style={{ borderRadius: 16, background: '#fafcff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text>平均会话时长</Text>
                     <Text style={{ color: '#1890ff' }}>2分30秒</Text>
@@ -458,7 +455,7 @@ const Analytics: React.FC = () => {
                     用户在系统中的平均停留时间
                   </Text>
                 </Card>
-                <Card bordered>
+                <Card bordered={false} style={{ borderRadius: 16, background: '#fafcff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text>平均页面浏览量</Text>
                     <Text style={{ color: '#1890ff' }}>5.2 页</Text>
@@ -467,7 +464,7 @@ const Analytics: React.FC = () => {
                     用户每次会话平均浏览的页面数
                   </Text>
                 </Card>
-                <Card bordered>
+                <Card bordered={false} style={{ borderRadius: 16, background: '#fafcff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text>跳出率</Text>
                     <Text style={{ color: '#1890ff' }}>23%</Text>
@@ -476,7 +473,7 @@ const Analytics: React.FC = () => {
                     只访问一个页面就离开的用户比例
                   </Text>
                 </Card>
-                <Card bordered>
+                <Card bordered={false} style={{ borderRadius: 16, background: '#fafcff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text>回访率</Text>
                     <Text style={{ color: '#1890ff' }}>65%</Text>
@@ -490,7 +487,7 @@ const Analytics: React.FC = () => {
           </Card>
         </TabPane>
       </Tabs>
-    </div>
+    </PageShell>
   );
 };
 

@@ -1,31 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Card, List, Badge, Button, Avatar, Modal, Empty, message, Spin } from 'antd';
 import { BellOutlined, MessageOutlined, CheckCircleOutlined, DeleteOutlined, LoadingOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import useAuthStore from '../../store/authStore';
+import { ExportButton } from '../common/PageKit';
+import { buildExportFileName, exportExcel, type ExcelColumn } from '../../utils/excel';
 
 interface Message {
-  _id: string;
+  id?: string;
+  _id?: string;
   content: string;
-  type: 'system' | 'popup' | 'sms';
+  type: 'system' | 'popup' | 'case_message' | string;
   recipientId: string;
-  senderId?: {
-    name: string;
-  };
-  caseId?: {
-    caseNumber: string;
-  };
+  senderId?: string;
+  senderName?: string;
+  receiverName?: string;
+  caseId?: string;
+  caseNumber?: string;
   isRead: boolean;
   createdAt: string;
 }
 
 const MessageCenter: React.FC = () => {
   const { userInfo } = useAuthStore();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const getMessageId = (msg: Message) => msg._id || msg.id || '';
+  const getSenderDisplayName = (msg: Message) => msg.senderName || '系统';
+  const getCaseDisplay = (msg: Message) => msg.caseNumber || msg.caseId || '';
+
+  const exportColumns: ExcelColumn<Message>[] = [
+    { header: '发送方', key: 'senderName', formatter: (row) => getSenderDisplayName(row) },
+    { header: '消息类型', key: 'type' },
+    { header: '内容', key: 'content' },
+    { header: '案件编号', key: 'caseNumber', formatter: (row) => getCaseDisplay(row) },
+    { header: '是否已读', key: 'isRead', formatter: (row) => row.isRead ? '已读' : '未读' },
+    { header: '接收时间', key: 'createdAt', formatter: (row) => new Date(row.createdAt).toLocaleString() }
+  ];
 
   // 获取消息列表
   const fetchMessages = async () => {
@@ -59,7 +76,7 @@ const MessageCenter: React.FC = () => {
     try {
       await api.put(`/message/${messageId}/read`);
       setMessages(prev => prev.map(msg => 
-        msg._id === messageId ? { ...msg, isRead: true } : msg
+        getMessageId(msg) === messageId ? { ...msg, isRead: true } : msg
       ));
       fetchUnreadCount();
     } catch (error) {
@@ -82,7 +99,7 @@ const MessageCenter: React.FC = () => {
   const deleteMessage = async (messageId: string) => {
     try {
       await api.delete(`/message/${messageId}`);
-      setMessages(prev => prev.filter(msg => msg._id !== messageId));
+      setMessages(prev => prev.filter(msg => getMessageId(msg) !== messageId));
       fetchUnreadCount();
     } catch (error) {
       message.error('删除消息失败');
@@ -94,8 +111,23 @@ const MessageCenter: React.FC = () => {
     setSelectedMessage(message);
     setModalVisible(true);
     if (!message.isRead) {
-      markAsRead(message._id);
+      markAsRead(getMessageId(message));
     }
+  };
+
+  const goToCaseDetail = (msg: Message) => {
+    if (!msg.caseId) return;
+    setModalVisible(false);
+    navigate(`/case/${msg.caseId}`);
+  };
+
+  const handleExport = () => {
+    if (messages.length === 0) {
+      message.warning('当前没有可导出的消息');
+      return;
+    }
+    exportExcel(buildExportFileName('消息中心'), exportColumns, messages);
+    message.success(`已导出 ${messages.length} 条消息`);
   };
 
   // 组件挂载时获取消息
@@ -111,8 +143,8 @@ const MessageCenter: React.FC = () => {
         return <MessageOutlined style={{ color: '#1890ff' }} />;
       case 'popup':
         return <BellOutlined style={{ color: '#faad14' }} />;
-      case 'sms':
-        return <MessageOutlined style={{ color: '#52c41a' }} />;
+      case 'case_message':
+        return <MessageOutlined style={{ color: '#722ed1' }} />;
       default:
         return <MessageOutlined />;
     }
@@ -124,11 +156,14 @@ const MessageCenter: React.FC = () => {
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>消息中心</span>
-            {unreadCount > 0 && (
-              <Button type="link" onClick={markAllAsRead}>
-                标记全部已读
-              </Button>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <ExportButton onClick={handleExport} />
+              {unreadCount > 0 && (
+                <Button type="link" onClick={markAllAsRead}>
+                  标记全部已读
+                </Button>
+              )}
+            </div>
           </div>
         }
         extra={
@@ -147,7 +182,7 @@ const MessageCenter: React.FC = () => {
             key="_id"
             renderItem={(message) => (
               <List.Item
-                key={message._id}
+                key={getMessageId(message)}
                 className={!message.isRead ? 'unread-message' : ''}
                 style={{
                   backgroundColor: !message.isRead ? '#f0f7ff' : 'transparent',
@@ -165,7 +200,7 @@ const MessageCenter: React.FC = () => {
                   }
                   title={
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{message.senderId?.name || '系统'}</span>
+                      <span>{getSenderDisplayName(message)}</span>
                       <span style={{ fontSize: 12, color: '#999' }}>
                         {new Date(message.createdAt).toLocaleString()}
                       </span>
@@ -180,7 +215,7 @@ const MessageCenter: React.FC = () => {
                         icon={<DeleteOutlined />}
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteMessage(message._id);
+                          deleteMessage(getMessageId(message));
                         }}
                       />
                     </div>
@@ -188,7 +223,7 @@ const MessageCenter: React.FC = () => {
                 />
                 {message.caseId && (
                   <div style={{ fontSize: 12, color: '#1890ff', marginTop: 4 }}>
-                    案件编号：{message.caseId.caseNumber}
+                    案件编号：{getCaseDisplay(message)}
                   </div>
                 )}
               </List.Item>
@@ -217,7 +252,7 @@ const MessageCenter: React.FC = () => {
                 <Avatar icon={getMessageIcon(selectedMessage.type)} style={{ marginRight: 8 }} />
                 <div>
                   <div style={{ fontWeight: 'bold' }}>
-                    {selectedMessage.senderId?.name || '系统'}
+                    {getSenderDisplayName(selectedMessage)}
                   </div>
                   <div style={{ fontSize: 12, color: '#999' }}>
                     {new Date(selectedMessage.createdAt).toLocaleString()}
@@ -230,7 +265,7 @@ const MessageCenter: React.FC = () => {
               {selectedMessage.caseId && (
                 <div style={{ padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
                   <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>案件信息</div>
-                  <div>案件编号：{selectedMessage.caseId.caseNumber}</div>
+                  <div>案件编号：{getCaseDisplay(selectedMessage)}</div>
                 </div>
               )}
             </div>
@@ -238,17 +273,25 @@ const MessageCenter: React.FC = () => {
               <Button
                 type="primary"
                 icon={<CheckCircleOutlined />}
-                onClick={() => markAsRead(selectedMessage._id)}
+                onClick={() => markAsRead(getMessageId(selectedMessage))}
                 style={{ marginRight: 8 }}
               >
                 标记为已读
+              </Button>
+            )}
+            {selectedMessage.caseId && (
+              <Button
+                style={{ marginRight: 8 }}
+                onClick={() => goToCaseDetail(selectedMessage)}
+              >
+                查看案件
               </Button>
             )}
             <Button
               danger
               icon={<DeleteOutlined />}
               onClick={() => {
-                deleteMessage(selectedMessage._id);
+                deleteMessage(getMessageId(selectedMessage));
                 setModalVisible(false);
               }}
             >

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Upload, Button } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
+import useAuthStore from '../../store/authStore';
 
 // 获取API基础URL
 const getApiBaseUrl = () => {
@@ -18,11 +19,13 @@ interface FileUploadProps {
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ caseId, onUploadSuccess, initialFiles = [] }) => {
+  const token = useAuthStore((state) => state.token);
   const uploadProps = {
     name: 'file',
     action: `${getApiBaseUrl()}/evidence`,
     method: 'POST',
     data: { caseId },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     onChange: (info: any) => {
       if (info.file.status === 'done') {
         if (onUploadSuccess) {

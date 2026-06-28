@@ -5,29 +5,14 @@
     <view class="login-subtitle">便捷·高效·专业</view>
   </view>
 
+  <view class="login-guide card">
+    <view class="guide-title">先浏览，再决定是否登录</view>
+    <view class="guide-text">你可以先进入首页查看公告、服务说明和功能入口，使用过程中再自行选择是否授权登录。</view>
+    <button class="btn-browse" bindtap="browseFirst">先逛一逛</button>
+  </view>
+
   <view class="login-form card">
-    <!-- 主按钮：微信快捷登录 -->
-    <button class="btn-wechat" loading="{{loading}}" disabled="{{loading}}" bindtap="onWechatLogin">
-      <text class="wechat-icon">💬</text> 微信快捷登录
-    </button>
-
-    <view class="divider">
-      <view class="divider-line"></view>
-      <text class="divider-text">或使用账号密码</text>
-      <view class="divider-line"></view>
-    </view>
-
-    <view class="form-item">
-      <text class="form-label">账号</text>
-      <input class="form-input" placeholder="请输入用户名/手机号" value="{{username}}" bindinput="onUsernameInput" />
-    </view>
-
-    <view class="form-item">
-      <text class="form-label">密码</text>
-      <input class="form-input" placeholder="请输入密码" password value="{{password}}" bindinput="onPasswordInput" />
-    </view>
-
-    <view class="form-item">
+    <view class="form-item role-selector-only">
       <text class="form-label">用户类型</text>
       <view class="role-tabs">
         <view class="role-tab {{role === 'personal' ? 'active' : ''}}" data-role="personal" bindtap="onRoleChange">
@@ -41,16 +26,62 @@
       </view>
     </view>
 
-    <button class="btn-primary" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">
-      登 录
+    <view class="form-item">
+      <text class="form-label">所属街道</text>
+      <view class="picker-display picker-trigger" bindtap="openTenantPanel">
+        <text>{{tenantLabel}}</text>
+        <text class="picker-arrow">▼</text>
+      </view>
+    </view>
+
+    <button class="btn-wechat" loading="{{loading}}" disabled="{{loading}}" bindtap="onWechatLogin">
+      <text class="wechat-icon">💬</text> 微信登录
     </button>
 
-    <view class="login-links">
-      <text bindtap="goRegister">还没有账号？立即注册</text>
+    <view class="wechat-login-tip">
+      <text>当前仅保留微信登录</text>
     </view>
   </view>
 
   <view class="login-footer">
-    <text class="text-muted text-sm">登录即表示同意《用户协议》和《隐私政策》</text>
+    <label class="agreement-row">
+      <checkbox-group bindchange="onAgreementChange">
+        <checkbox class="agreement-checkbox" value="agree" checked="{{agreeProtocol}}" color="#1890ff" />
+      </checkbox-group>
+      <text class="text-muted text-sm">我已阅读并自愿同意</text>
+      <text class="agreement-link text-sm" data-type="service" bindtap="viewAgreement">《用户服务协议》</text>
+      <text class="text-muted text-sm">和</text>
+      <text class="agreement-link text-sm" data-type="privacy" bindtap="viewAgreement">《隐私政策》</text>
+    </label>
+    <view class="agreement-tip">未勾选前，你仍可先浏览首页与公开服务说明。</view>
+  </view>
+
+  <view wx:if="{{showTenantPanel}}" class="tenant-panel-mask" bindtap="closeTenantPanel">
+    <view class="tenant-panel" catchtap="noop">
+      <view class="tenant-panel-title">选择所属街道</view>
+      <input
+        class="tenant-search-input"
+        placeholder="搜索街道名称、区名称"
+        value="{{tenantKeyword}}"
+        bindinput="onTenantKeywordInput"
+        confirm-type="search"
+      />
+      <scroll-view class="tenant-list" scroll-y="true">
+        <view
+          wx:for="{{filteredTenants}}"
+          wx:key="id"
+          class="tenant-item {{item.id === tenantId ? 'active' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTenantItemTap"
+        >
+          <view class="tenant-item-name">{{item.tenantName}}</view>
+          <view class="tenant-item-meta" wx:if="{{item.districtName || item.streetName}}">
+            {{item.districtName || ''}}{{item.streetName ? ' · ' + item.streetName : ''}}
+          </view>
+        </view>
+        <view wx:if="{{!filteredTenants.length}}" class="tenant-empty">没有找到匹配的街道</view>
+      </scroll-view>
+      <button class="tenant-close-btn" bindtap="closeTenantPanel">关闭</button>
+    </view>
   </view>
 </view>

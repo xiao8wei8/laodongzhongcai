@@ -343,9 +343,9 @@ async function migrateVisitorRecords(connection: any) {
     await connection.query(
       `INSERT INTO visitor_records (
         id, registerNumber, visitorName, phone, visitType, disputeType, reason, 
-        mediatorId, sendSmsVerification, sendEmailVerification, email, status, 
+        mediatorId, status, 
         createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         record._id.toString(),
         record.registerNumber,
@@ -355,9 +355,6 @@ async function migrateVisitorRecords(connection: any) {
         record.disputeType || null,
         record.reason,
         record.mediatorId?.toString() || null,
-        record.sendSmsVerification || false,
-        record.sendEmailVerification || false,
-        record.email || null,
         record.status || 'pending',
         record.createdAt || new Date(),
         record.updatedAt || new Date()

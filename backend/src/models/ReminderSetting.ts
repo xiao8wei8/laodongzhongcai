@@ -17,14 +17,6 @@ const ReminderSettingSchema = new mongoose.Schema({
     system: {
       type: Boolean,
       default: true
-    },
-    email: {
-      type: Boolean,
-      default: true
-    },
-    sms: {
-      type: Boolean,
-      default: false
     }
   },
   workdayOnly: {

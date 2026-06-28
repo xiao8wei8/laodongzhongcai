@@ -1,8 +1,8 @@
 // 腾讯云短信服务配置
 const smsConfig = {
   // 腾讯云账号密钥
-  secretId: process.env.TENCENT_CLOUD_SECRET_ID || '',
-  secretKey: process.env.TENCENT_CLOUD_SECRET_KEY || '',
+  secretId: process.env.TENCENT_CLOUD_SECRET_ID || process.env.SMS_SECRET_ID || '',
+  secretKey: process.env.TENCENT_CLOUD_SECRET_KEY || process.env.SMS_SECRET_KEY || '',
   
   // 短信应用ID
   sdkAppId: process.env.SMS_SDK_APP_ID || '',
@@ -13,11 +13,11 @@ const smsConfig = {
   // 模板ID
   templateIds: {
     // 验证码模板
-    verification: process.env.SMS_TEMPLATE_VERIFICATION || '',
+    verification: process.env.SMS_TEMPLATE_VERIFICATION || process.env.SMS_TEMPLATE_ID_VERIFICATION || '',
     // 通知模板
-    notification: process.env.SMS_TEMPLATE_NOTIFICATION || '',
+    notification: process.env.SMS_TEMPLATE_NOTIFICATION || process.env.SMS_TEMPLATE_ID_NOTIFICATION || '',
     // 注册成功模板
-    registerSuccess: process.env.SMS_TEMPLATE_REGISTER_SUCCESS || '',
+    registerSuccess: process.env.SMS_TEMPLATE_REGISTER_SUCCESS || process.env.SMS_TEMPLATE_ID_REGISTER_SUCCESS || '',
   },
   
   // 短信服务区域

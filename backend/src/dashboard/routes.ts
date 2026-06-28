@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardData, getStats, getPendingCases, getCaseTrendData, getCaseTypeData, getVisitorTrendData } from './controller';
+import { getDashboardData, getStats, getPendingCases, getCaseTrendData, getCaseTypeData, getVisitorTrendData, getMediatorOverview, getDutyOverview, getDutyStabilityRanking } from './controller';
 import { auth } from '../middleware/auth';
 
 const router = express.Router();
@@ -21,5 +21,8 @@ router.get('/case-type', auth, getCaseTypeData);
 
 // 获取访客趋势数据
 router.get('/visitor-trend', auth, getVisitorTrendData);
+router.get('/mediator-overview', auth, getMediatorOverview);
+router.get('/duty-overview', auth, getDutyOverview);
+router.get('/duty-stability-ranking', auth, getDutyStabilityRanking);
 
 export default router;

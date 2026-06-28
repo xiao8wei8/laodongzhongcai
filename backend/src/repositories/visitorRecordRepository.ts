@@ -6,13 +6,12 @@ interface VisitorRecord {
   registerNumber: string;
   visitorName: string;
   phone: string;
+  street?: string | null;
   visitType: 'visit' | 'phone';
   disputeType?: string;
   reason: string;
   mediatorId?: string;
-  sendSmsVerification?: boolean;
-  sendEmailVerification?: boolean;
-  email?: string;
+  tenantId?: string | null;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +19,7 @@ interface VisitorRecord {
 
 interface VisitorRecordWithRelations extends VisitorRecord {
   mediatorName?: string;
+  mediatorPhone?: string;
 }
 
 class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
@@ -45,7 +45,7 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
 
   async findWithRelations(id: string): Promise<VisitorRecordWithRelations | null> {
     const [rows] = await pool.query(
-      `SELECT vr.*, u.name as mediatorName 
+      `SELECT vr.*, u.name as mediatorName, COALESCE(u.phone, u.officePhone) as mediatorPhone
        FROM ${this.tableName} vr 
        LEFT JOIN users u ON vr.mediatorId = u.id 
        WHERE vr.id = ?`,
@@ -55,29 +55,36 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     return results[0] || null;
   }
 
-  async findAllWithRelations(): Promise<VisitorRecordWithRelations[]> {
+  async findAllWithRelations(tenantId?: string | null): Promise<VisitorRecordWithRelations[]> {
+    const whereClause = tenantId ? 'WHERE vr.tenantId = ?' : '';
     const [rows] = await pool.query(
-      `SELECT vr.*, u.name as mediatorName 
+      `SELECT vr.*, u.name as mediatorName, COALESCE(u.phone, u.officePhone) as mediatorPhone
        FROM ${this.tableName} vr 
        LEFT JOIN users u ON vr.mediatorId = u.id 
+       ${whereClause}
        ORDER BY vr.createdAt DESC`
+      ,
+      tenantId ? [tenantId] : []
     );
     return rows as VisitorRecordWithRelations[];
   }
 
-  async searchRecords(query: string): Promise<VisitorRecordWithRelations[]> {
+  async searchRecords(query: string, tenantId?: string | null): Promise<VisitorRecordWithRelations[]> {
+    const whereClause = tenantId
+      ? 'WHERE (vr.visitorName LIKE ? OR vr.phone LIKE ? OR vr.registerNumber LIKE ?) AND vr.tenantId = ?'
+      : 'WHERE vr.visitorName LIKE ? OR vr.phone LIKE ? OR vr.registerNumber LIKE ?';
     const [rows] = await pool.query(
-      `SELECT vr.*, u.name as mediatorName 
+      `SELECT vr.*, u.name as mediatorName, COALESCE(u.phone, u.officePhone) as mediatorPhone
        FROM ${this.tableName} vr 
        LEFT JOIN users u ON vr.mediatorId = u.id 
-       WHERE vr.visitorName LIKE ? OR vr.phone LIKE ? OR vr.registerNumber LIKE ?
+       ${whereClause}
        ORDER BY vr.createdAt DESC`,
-      [`%${query}%`, `%${query}%`, `%${query}%`]
+      tenantId ? [`%${query}%`, `%${query}%`, `%${query}%`, tenantId] : [`%${query}%`, `%${query}%`, `%${query}%`]
     );
     return rows as VisitorRecordWithRelations[];
   }
 
-  async paginateRecords(page: number = 1, limit: number = 10, status?: string): Promise<{ records: VisitorRecordWithRelations[], total: number }> {
+  async paginateRecords(page: number = 1, limit: number = 10, status?: string, tenantId?: string | null): Promise<{ records: VisitorRecordWithRelations[], total: number }> {
     const offset = (page - 1) * limit;
     let whereClause = '';
     const params: any[] = [];
@@ -86,9 +93,13 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
       whereClause = 'WHERE vr.status = ?';
       params.push(status);
     }
+    if (tenantId) {
+      whereClause += whereClause ? ' AND vr.tenantId = ?' : 'WHERE vr.tenantId = ?';
+      params.push(tenantId);
+    }
 
     const [rows] = await pool.query(
-      `SELECT vr.*, u.name as mediatorName 
+      `SELECT vr.*, u.name as mediatorName, COALESCE(u.phone, u.officePhone) as mediatorPhone
        FROM ${this.tableName} vr 
        LEFT JOIN users u ON vr.mediatorId = u.id 
        ${whereClause}
@@ -108,13 +119,16 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     };
   }
 
-  async getStatistics(mediatorId?: string): Promise<any> {
+  async getStatistics(mediatorId?: string, tenantId?: string | null): Promise<any> {
     let whereClause = '';
     const params: any[] = [];
 
     if (mediatorId) {
       whereClause = 'WHERE mediatorId = ?';
       params.push(mediatorId);
+    } else if (tenantId) {
+      whereClause = 'WHERE tenantId = ?';
+      params.push(tenantId);
     }
 
     const [result] = await pool.query(`
@@ -130,7 +144,7 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     return (result as any)[0];
   }
 
-  async getTodayCount(mediatorId?: string): Promise<number> {
+  async getTodayCount(mediatorId?: string, tenantId?: string | null): Promise<number> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -142,6 +156,9 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     if (mediatorId) {
       whereClause = 'WHERE mediatorId = ? AND createdAt >= ? AND createdAt < ?';
       params.unshift(mediatorId);
+    } else if (tenantId) {
+      whereClause = 'WHERE tenantId = ? AND createdAt >= ? AND createdAt < ?';
+      params.unshift(tenantId);
     }
 
     const [result] = await pool.query(
@@ -151,13 +168,16 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     return (result as any)[0].count;
   }
 
-  async getTrendData(mediatorId?: string): Promise<any[]> {
+  async getTrendData(mediatorId?: string, tenantId?: string | null): Promise<any[]> {
     let whereClause = '';
     const params: any[] = [];
 
     if (mediatorId) {
       whereClause = 'WHERE mediatorId = ?';
       params.push(mediatorId);
+    } else if (tenantId) {
+      whereClause = 'WHERE tenantId = ?';
+      params.push(tenantId);
     }
 
     const now = new Date();
@@ -182,13 +202,16 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     return trendData;
   }
 
-  async getPendingAndProcessing(mediatorId?: string): Promise<VisitorRecordWithRelations[]> {
+  async getPendingAndProcessing(mediatorId?: string, tenantId?: string | null): Promise<VisitorRecordWithRelations[]> {
     let whereClause = 'WHERE status IN (?, ?)';
     const params: any[] = ['pending', 'processing'];
 
     if (mediatorId) {
-      whereClause = 'WHERE mediatorId = ? AND status IN (?, ?)';
+      whereClause = 'WHERE vr.mediatorId = ? AND vr.status IN (?, ?)';
       params.unshift(mediatorId);
+    } else if (tenantId) {
+      whereClause = 'WHERE vr.tenantId = ? AND vr.status IN (?, ?)';
+      params.unshift(tenantId);
     }
 
     const [rows] = await pool.query(
@@ -203,16 +226,16 @@ class VisitorRecordRepository extends BaseRepository<VisitorRecord> {
     return rows as VisitorRecordWithRelations[];
   }
 
-  async getOverdueRecords(mediatorId: string, days: number = 10): Promise<VisitorRecord[]> {
+  async getOverdueRecords(userId: string, days: number = 10, tenantId?: string | null): Promise<VisitorRecord[]> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     
     const [rows] = await pool.query(
       `SELECT * FROM ${this.tableName} 
-       WHERE mediatorId = ? 
+       WHERE ${tenantId ? 'tenantId = ?' : 'mediatorId = ?'}
        AND createdAt < ?
        ORDER BY createdAt ASC`,
-      [mediatorId, cutoffDate]
+      [tenantId || userId, cutoffDate]
     );
     return rows as VisitorRecord[];
   }

@@ -30,17 +30,6 @@ const VisitorRecordSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  sendSmsVerification: {
-    type: Boolean,
-    default: false
-  },
-  sendEmailVerification: {
-    type: Boolean,
-    default: false
-  },
-  email: {
-    type: String
-  },
   status: {
     type: String,
     default: 'pending',

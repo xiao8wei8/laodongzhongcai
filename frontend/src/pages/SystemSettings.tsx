@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Select, Switch, Button, message, Tabs, Typography } from 'antd';
-import { SaveOutlined, SettingOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Select, Switch, Button, message, Tabs, Typography, Alert, Row, Col, Statistic, Space, Avatar, Divider, Tag } from 'antd';
+import { SaveOutlined, SettingOutlined, SafetyCertificateOutlined, BellOutlined, ApiOutlined, TeamOutlined } from '@ant-design/icons';
 import api from '../services/api';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -13,44 +13,22 @@ interface SystemSettings {
     systemName: string;
     systemIcon: string;
     contactPhone: string;
-    contactEmail: string;
     address: string;
+    homeBannerEnabled: boolean;
+    homeBannerTitle: string;
+    homeBannerSubtitle: string;
+    homeBannerImage: string;
+    homeBannerLink: string;
+    homeBannerButtonText: string;
+    homeBannerBgStart: string;
+    homeBannerBgEnd: string;
   };
   security: {
     passwordPolicy: string;
     loginAttempts: number;
     sessionTimeout: number;
   };
-  notification: {
-    enableEmail: boolean;
-    enableSms: boolean;
-    emailTemplate: string;
-  };
   apiKeys: {
-    sms: {
-      secretId: string;
-      secretKey: string;
-      sdkAppId: string;
-      signName: string;
-      templateIds: {
-        verification: string;
-        notification: string;
-        registerSuccess: string;
-      };
-    };
-    email: {
-      secretId: string;
-      secretKey: string;
-      sender: {
-        email: string;
-        name: string;
-      };
-      templates: {
-        registerSuccess: string;
-        passwordReset: string;
-        caseNotification: string;
-      };
-    };
     tencent: {
       secretId: string;
       secretKey: string;
@@ -62,9 +40,20 @@ interface SystemSettings {
   };
 }
 
+interface ReminderSetting {
+  reminderTime: string;
+  notificationChannels: {
+    system: boolean;
+  };
+  workdayOnly: boolean;
+  caseReminderDays: number;
+}
+
 const SystemSettings: React.FC = () => {
   const [form] = Form.useForm();
+  const [reminderForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [reminderLoading, setReminderLoading] = useState(false);
   const [mediators, setMediators] = useState<any[]>([]);
   const [onDutyMediator, setOnDutyMediator] = useState<any>(null);
   const [mediatorLoading, setMediatorLoading] = useState(false);
@@ -75,44 +64,22 @@ const SystemSettings: React.FC = () => {
       systemName: '劳动仲裁调解系统',
       systemIcon: 'BankOutlined',
       contactPhone: '400-123-4567',
-      contactEmail: 'support@example.com',
-      address: '北京市朝阳区建国路88号'
+      address: '北京市朝阳区建国路88号',
+      homeBannerEnabled: true,
+      homeBannerTitle: '劳动仲裁调解系统',
+      homeBannerSubtitle: '便捷·高效·专业',
+      homeBannerImage: '',
+      homeBannerLink: '',
+      homeBannerButtonText: '',
+      homeBannerBgStart: '#1890ff',
+      homeBannerBgEnd: '#096dd9'
     },
     security: {
       passwordPolicy: 'medium',
       loginAttempts: 5,
       sessionTimeout: 24
     },
-    notification: {
-      enableEmail: true,
-      enableSms: false,
-      emailTemplate: '尊敬的用户，您有一条新消息：{message}'
-    },
     apiKeys: {
-      sms: {
-        secretId: '',
-        secretKey: '',
-        sdkAppId: '',
-        signName: '',
-        templateIds: {
-          verification: '',
-          notification: '',
-          registerSuccess: ''
-        }
-      },
-      email: {
-        secretId: '',
-        secretKey: '',
-        sender: {
-          email: '',
-          name: ''
-        },
-        templates: {
-          registerSuccess: '',
-          passwordReset: '',
-          caseNotification: ''
-        }
-      },
       tencent: {
         secretId: '',
         secretKey: ''
@@ -122,6 +89,15 @@ const SystemSettings: React.FC = () => {
         accessKeySecret: ''
       }
     }
+  };
+
+  const initialReminderSettings: ReminderSetting = {
+    reminderTime: '30min',
+    notificationChannels: {
+      system: true
+    },
+    workdayOnly: true,
+    caseReminderDays: 15
   };
 
   // 加载设置
@@ -148,6 +124,44 @@ const SystemSettings: React.FC = () => {
       message.error('设置保存失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadReminderSettings = async () => {
+    setReminderLoading(true);
+    try {
+      const response = await api.get('/user/reminder/setting');
+      const nextValues: ReminderSetting = {
+        reminderTime: response.data?.setting?.reminderTime || '30min',
+        notificationChannels: {
+          system: true
+        },
+        workdayOnly: response.data?.setting?.workdayOnly ?? true,
+        caseReminderDays: Number(response.data?.setting?.caseReminderDays || 15)
+      };
+      reminderForm.setFieldsValue(nextValues);
+    } catch (error) {
+      message.error('加载系统提醒设置失败');
+      reminderForm.setFieldsValue(initialReminderSettings);
+    } finally {
+      setReminderLoading(false);
+    }
+  };
+
+  const saveReminderSettings = async (values: ReminderSetting) => {
+    setReminderLoading(true);
+    try {
+      await api.put('/user/reminder/setting', {
+        ...values,
+        notificationChannels: {
+          system: true
+        }
+      });
+      message.success('系统提醒设置已保存');
+    } catch (error) {
+      message.error('保存系统提醒设置失败');
+    } finally {
+      setReminderLoading(false);
     }
   };
 
@@ -194,319 +208,449 @@ const SystemSettings: React.FC = () => {
   // 组件挂载时加载设置
   React.useEffect(() => {
     loadSettings();
+    loadReminderSettings();
     fetchMediators();
     fetchOnDutyMediator();
   }, []);
 
+  const settingStats = [
+    { title: '系统基础配置', value: 1, suffix: '组', color: '#1677ff' },
+    { title: '安全与提醒', value: 2, suffix: '类', color: '#722ed1' },
+    { title: '值班配置', value: onDutyMediator ? 1 : 0, suffix: '项', color: '#13a8a8' },
+    { title: '平台密钥', value: 2, suffix: '组', color: '#fa8c16' }
+  ];
+
   return (
-    <div style={{ backgroundColor: 'white', padding: 24, borderRadius: 8 }}>
-      <div style={{ 
-        marginBottom: 24, 
-        display: 'flex', 
-        flexDirection: 'column',
-        gap: 12,
-        alignItems: 'flex-start'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <SettingOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-          <Title level={2} style={{ margin: 0, fontSize: '18px', whiteSpace: 'nowrap' }}>系统设置</Title>
-        </div>
-        <Button type="primary" icon={<SaveOutlined />} onClick={() => form.submit()} loading={loading}>
-          保存设置
-        </Button>
-      </div>
+    <div style={{ padding: 4 }}>
+      <Card
+        bordered={false}
+        style={{
+          marginBottom: 20,
+          borderRadius: 20,
+          background: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)',
+          color: '#fff',
+          overflow: 'hidden'
+        }}
+        bodyStyle={{ padding: 24 }}
+      >
+        <Row gutter={[24, 24]} align="middle">
+          <Col xs={24} lg={16}>
+            <Space direction="vertical" size={10}>
+              <Space size={12} align="start">
+                <Avatar size={46} icon={<SettingOutlined />} style={{ background: 'rgba(255,255,255,0.18)', color: '#fff' }} />
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>系统配置中心</div>
+                  <div style={{ color: 'rgba(255,255,255,0.78)', lineHeight: 1.8 }}>
+                    统一维护平台基础信息、安全策略、系统提醒、值班安排和平台密钥。建议先确认范围，再进入对应标签页修改。
+                  </div>
+                </div>
+              </Space>
+              <Space wrap>
+                <Tag color="blue-inverse" style={{ borderRadius: 999 }}>配置修改即时生效</Tag>
+                <Tag color="geekblue-inverse" style={{ borderRadius: 999 }}>高风险项建议先在测试环境验证</Tag>
+              </Space>
+            </Space>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Row gutter={[12, 12]}>
+              {settingStats.map((item) => (
+                <Col span={12} key={item.title}>
+                  <Card size="small" bordered={false} style={{ borderRadius: 16, background: 'rgba(255,255,255,0.08)' }}>
+                    <Statistic title={<span style={{ color: 'rgba(255,255,255,0.72)' }}>{item.title}</span>} value={item.value} suffix={item.suffix} valueStyle={{ color: '#fff' }} />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </Col>
+        </Row>
+      </Card>
 
-      <div style={{ overflowX: 'auto' }}>
-        <Tabs 
+      <Card
+        bordered={false}
+        style={{ borderRadius: 18, boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)' }}
+        bodyStyle={{ padding: 22 }}
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 18, borderRadius: 12 }}
+          message="配置建议"
+          description="基础信息和展示文案优先由超级管理员统一维护；安全、提醒和值班相关配置建议在业务低峰期调整；平台密钥修改后请重新验证依赖服务。"
+        />
+
+        <Tabs
           defaultActiveKey="basic"
-          style={{ 
-            minWidth: 300,
-            width: '100%'
-          }}
-        >
-        <TabPane tab="基本设置" key="basic">
-          <Card>
-            <Form form={form} layout="vertical" onFinish={saveSettings}>
-              <Form.Item
-                name={['basic', 'systemName']}
-                label="系统名称"
-                rules={[{ required: true, message: '请输入系统名称' }]}
-              >
-                <Input placeholder="请输入系统名称" />
-              </Form.Item>
+          tabBarGutter={24}
+          items={[
+            {
+              key: 'basic',
+              label: (
+                <Space size={8}>
+                  <SettingOutlined />
+                  <span>基本设置</span>
+                </Space>
+              ),
+              children: (
+                <Card bordered={false} style={{ background: '#fafcff', borderRadius: 16 }}>
+                  <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>平台基础信息</Title>
+                      <Text type="secondary">决定系统名称、系统图标、联系信息以及首页 Banner 的呈现方式。</Text>
+                    </div>
+                    <Form form={form} layout="vertical" onFinish={saveSettings}>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name={['basic', 'systemName']}
+                            label="系统名称"
+                            rules={[{ required: true, message: '请输入系统名称' }]}
+                          >
+                            <Input placeholder="请输入系统名称" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name={['basic', 'systemIcon']}
+                            label="系统图标"
+                            rules={[{ required: true, message: '请选择系统图标' }]}
+                          >
+                            <Select placeholder="请选择系统图标">
+                              <Option value="BankOutlined">银行图标</Option>
+                              <Option value="BuildingOutlined">建筑图标</Option>
+                              <Option value="TeamOutlined">团队图标</Option>
+                              <Option value="UserOutlined">用户图标</Option>
+                              <Option value="FileTextOutlined">文件图标</Option>
+                              <Option value="SettingOutlined">设置图标</Option>
+                              <Option value="BellOutlined">铃铛图标</Option>
+                              <Option value="DashboardOutlined">仪表盘图标</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-              <Form.Item
-                name={['basic', 'systemIcon']}
-                label="系统图标"
-                rules={[{ required: true, message: '请选择系统图标' }]}
-              >
-                <Select placeholder="请选择系统图标">
-                  <Option value="BankOutlined">银行图标</Option>
-                  <Option value="BuildingOutlined">建筑图标</Option>
-                  <Option value="TeamOutlined">团队图标</Option>
-                  <Option value="UserOutlined">用户图标</Option>
-                  <Option value="FileTextOutlined">文件图标</Option>
-                  <Option value="SettingOutlined">设置图标</Option>
-                  <Option value="BellOutlined">铃铛图标</Option>
-                  <Option value="DashboardOutlined">仪表盘图标</Option>
-                </Select>
-              </Form.Item>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name={['basic', 'contactPhone']}
+                            label="联系电话"
+                            rules={[{ required: true, message: '请输入联系电话' }]}
+                          >
+                            <Input placeholder="请输入联系电话" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name={['basic', 'address']}
+                            label="办公地址"
+                            rules={[{ required: true, message: '请输入办公地址' }]}
+                          >
+                            <Input placeholder="请输入办公地址" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-              <Form.Item
-                name={['basic', 'contactPhone']}
-                label="联系电话"
-                rules={[{ required: true, message: '请输入联系电话' }]}
-              >
-                <Input placeholder="请输入联系电话" />
-              </Form.Item>
+                      <Divider orientation="left" plain>首页 Banner</Divider>
 
-              <Form.Item
-                name={['basic', 'contactEmail']}
-                label="联系邮箱"
-                rules={[{ required: true, message: '请输入联系邮箱' }]}
-              >
-                <Input placeholder="请输入联系邮箱" />
-              </Form.Item>
+                      <Form.Item
+                        name={['basic', 'homeBannerEnabled']}
+                        label="首页广告位"
+                        valuePropName="checked"
+                      >
+                        <Switch checkedChildren="启用" unCheckedChildren="关闭" />
+                      </Form.Item>
 
-              <Form.Item
-                name={['basic', 'address']}
-                label="办公地址"
-                rules={[{ required: true, message: '请输入办公地址' }]}
-              >
-                <Input placeholder="请输入办公地址" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['basic', 'homeBannerTitle']} label="广告标题">
+                            <Input placeholder="请输入首页广告标题" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['basic', 'homeBannerSubtitle']} label="广告副标题">
+                            <Input placeholder="请输入首页广告副标题" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-        <TabPane tab="安全设置" key="security">
-          <Card>
-            <Form form={form} layout="vertical" onFinish={saveSettings}>
-              <Form.Item
-                name={['security', 'passwordPolicy']}
-                label="密码策略"
-                rules={[{ required: true, message: '请选择密码策略' }]}
-              >
-                <Select placeholder="请选择密码策略">
-                  <Option value="low">低（6位以上）</Option>
-                  <Option value="medium">中（8位以上，包含字母和数字）</Option>
-                  <Option value="high">高（10位以上，包含字母、数字和特殊字符）</Option>
-                </Select>
-              </Form.Item>
+                      <Form.Item
+                        name={['basic', 'homeBannerImage']}
+                        label="广告图片地址"
+                        extra="可填写完整图片 URL；为空时显示纯色渐变广告位。"
+                      >
+                        <Input placeholder="请输入广告图片 URL" />
+                      </Form.Item>
 
-              <Form.Item
-                name={['security', 'loginAttempts']}
-                label="登录尝试次数"
-                rules={[{ required: true, message: '请输入登录尝试次数' }]}
-              >
-                <Input type="number" placeholder="请输入登录尝试次数" min={1} max={10} />
-              </Form.Item>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name={['basic', 'homeBannerLink']}
+                            label="广告跳转路径"
+                            extra="支持小程序页面路径，如 /pages/messages/messages"
+                          >
+                            <Input placeholder="请输入广告点击后的跳转路径" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['basic', 'homeBannerButtonText']} label="按钮文案">
+                            <Input placeholder="例如：立即查看" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-              <Form.Item
-                name={['security', 'sessionTimeout']}
-                label="会话超时时间（小时）"
-                rules={[{ required: true, message: '请输入会话超时时间' }]}
-              >
-                <Input type="number" placeholder="请输入会话超时时间" min={1} max={72} />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['basic', 'homeBannerBgStart']} label="渐变起始色">
+                            <Input placeholder="例如：#1890ff" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['basic', 'homeBannerBgEnd']} label="渐变结束色">
+                            <Input placeholder="例如：#096dd9" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-        <TabPane tab="通知设置" key="notification">
-          <Card>
-            <Form form={form} layout="vertical" onFinish={saveSettings}>
-              <Form.Item
-                name={['notification', 'enableEmail']}
-                label="启用邮件通知"
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-
-              <Form.Item
-                name={['notification', 'enableSms']}
-                label="启用短信通知"
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-
-              <Form.Item
-                name={['notification', 'emailTemplate']}
-                label="邮件模板"
-                rules={[{ required: true, message: '请输入邮件模板' }]}
-              >
-                <Input.TextArea rows={3} placeholder="请输入邮件模板，{message} 会被替换为实际消息内容" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
-
-        <TabPane tab="值班管理" key="duty">
-          <Card>
-            <Form form={form} layout="vertical" onFinish={handleSetOnDutyMediator}>
-              <Form.Item
-                name="onDutyMediator"
-                label="当日值班调解员"
-                rules={[{ required: true, message: '请选择值班调解员' }]}
-              >
-                <Select placeholder="请选择值班调解员" loading={mediatorLoading}>
-                  {mediators.map((mediator) => (
-                    <Option key={mediator._id} value={mediator._id}>
-                      {mediator.name} ({mediator.phone})
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              <div style={{ marginBottom: 16 }}>
-                {onDutyMediator ? (
-                  <p style={{ color: '#1890ff' }}>
-                    当前值班调解员：{onDutyMediator.name} ({onDutyMediator.phone})
-                  </p>
-                ) : (
-                  <p style={{ color: '#faad14' }}>
-                    当前无值班调解员，请设置
-                  </p>
-                )}
-              </div>
-
-              <Form.Item>
-                <Button type="primary" htmlType="submit" loading={mediatorLoading}>
-                  设置值班调解员
-                </Button>
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
-
-        <TabPane tab="API Key管理" key="apiKeys">
-          <Card>
-            <Form form={form} layout="vertical" onFinish={saveSettings}>
-              <Title level={3}>短信服务API Key</Title>
-              <Form.Item
-                name={['apiKeys', 'sms', 'secretId']}
-                label="Secret ID"
-              >
-                <Input placeholder="请输入短信服务Secret ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'sms', 'secretKey']}
-                label="Secret Key"
-              >
-                <Input.Password placeholder="请输入短信服务Secret Key" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'sms', 'sdkAppId']}
-                label="SDK App ID"
-              >
-                <Input placeholder="请输入短信服务SDK App ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'sms', 'signName']}
-                label="签名名称"
-              >
-                <Input placeholder="请输入短信服务签名名称" />
-              </Form.Item>
-              <Title level={4}>短信模板ID</Title>
-              <Form.Item
-                name={['apiKeys', 'sms', 'templateIds', 'verification']}
-                label="验证码模板ID"
-              >
-                <Input placeholder="请输入验证码短信模板ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'sms', 'templateIds', 'notification']}
-                label="通知模板ID"
-              >
-                <Input placeholder="请输入通知短信模板ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'sms', 'templateIds', 'registerSuccess']}
-                label="注册成功模板ID"
-              >
-                <Input placeholder="请输入注册成功短信模板ID" />
-              </Form.Item>
-
-              <Title level={3} style={{ marginTop: 24 }}>邮件服务API Key</Title>
-              <Form.Item
-                name={['apiKeys', 'email', 'secretId']}
-                label="Secret ID"
-              >
-                <Input placeholder="请输入邮件服务Secret ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'email', 'secretKey']}
-                label="Secret Key"
-              >
-                <Input.Password placeholder="请输入邮件服务Secret Key" />
-              </Form.Item>
-              <Title level={4}>发件人信息</Title>
-              <Form.Item
-                name={['apiKeys', 'email', 'sender', 'email']}
-                label="发件人邮箱"
-              >
-                <Input placeholder="请输入发件人邮箱" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'email', 'sender', 'name']}
-                label="发件人名称"
-              >
-                <Input placeholder="请输入发件人名称" />
-              </Form.Item>
-              <Title level={4}>邮件模板</Title>
-              <Form.Item
-                name={['apiKeys', 'email', 'templates', 'registerSuccess']}
-                label="注册成功模板"
-              >
-                <Input.TextArea rows={3} placeholder="请输入注册成功邮件模板" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'email', 'templates', 'passwordReset']}
-                label="密码重置模板"
-              >
-                <Input.TextArea rows={3} placeholder="请输入密码重置邮件模板" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'email', 'templates', 'caseNotification']}
-                label="案件通知模板"
-              >
-                <Input.TextArea rows={3} placeholder="请输入案件通知邮件模板" />
-              </Form.Item>
-
-              <Title level={3} style={{ marginTop: 24 }}>腾讯云服务API Key</Title>
-              <Form.Item
-                name={['apiKeys', 'tencent', 'secretId']}
-                label="Secret ID"
-              >
-                <Input placeholder="请输入腾讯云Secret ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'tencent', 'secretKey']}
-                label="Secret Key"
-              >
-                <Input.Password placeholder="请输入腾讯云Secret Key" />
-              </Form.Item>
-
-              <Title level={3} style={{ marginTop: 24 }}>阿里云服务API Key</Title>
-              <Form.Item
-                name={['apiKeys', 'aliyun', 'accessKeyId']}
-                label="Access Key ID"
-              >
-                <Input placeholder="请输入阿里云Access Key ID" />
-              </Form.Item>
-              <Form.Item
-                name={['apiKeys', 'aliyun', 'accessKeySecret']}
-                label="Access Key Secret"
-              >
-                <Input.Password placeholder="请输入阿里云Access Key Secret" />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
-        </Tabs>
-      </div>
+                      <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} size="large" style={{ borderRadius: 10 }}>
+                        保存基本设置
+                      </Button>
+                    </Form>
+                  </Space>
+                </Card>
+              )
+            },
+            {
+              key: 'security',
+              label: (
+                <Space size={8}>
+                  <SafetyCertificateOutlined />
+                  <span>安全设置</span>
+                </Space>
+              ),
+              children: (
+                <Card bordered={false} style={{ background: '#fafcff', borderRadius: 16 }}>
+                  <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>账号与会话安全</Title>
+                      <Text type="secondary">配置密码复杂度、登录尝试次数和会话超时时间，优先控制系统入口风险。</Text>
+                    </div>
+                    <Form form={form} layout="vertical" onFinish={saveSettings}>
+                      <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name={['security', 'passwordPolicy']}
+                            label="密码策略"
+                            rules={[{ required: true, message: '请选择密码策略' }]}
+                          >
+                            <Select placeholder="请选择密码策略">
+                              <Option value="low">低（6位以上）</Option>
+                              <Option value="medium">中（8位以上，包含字母和数字）</Option>
+                              <Option value="high">高（10位以上，包含字母、数字和特殊字符）</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name={['security', 'loginAttempts']}
+                            label="登录尝试次数"
+                            rules={[{ required: true, message: '请输入登录尝试次数' }]}
+                          >
+                            <Input type="number" placeholder="请输入登录尝试次数" min={1} max={10} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name={['security', 'sessionTimeout']}
+                            label="会话超时时间（小时）"
+                            rules={[{ required: true, message: '请输入会话超时时间' }]}
+                          >
+                            <Input type="number" placeholder="请输入会话超时时间" min={1} max={72} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} size="large" style={{ borderRadius: 10 }}>
+                        保存安全设置
+                      </Button>
+                    </Form>
+                  </Space>
+                </Card>
+              )
+            },
+            {
+              key: 'reminder',
+              label: (
+                <Space size={8}>
+                  <BellOutlined />
+                  <span>系统提醒</span>
+                </Space>
+              ),
+              children: (
+                <Card bordered={false} style={{ background: '#fafcff', borderRadius: 16 }}>
+                  <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>站内提醒策略</Title>
+                      <Text type="secondary">当前仅保留站内提醒。短信、邮件相关能力和配置入口已从系统中移除。</Text>
+                    </div>
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ borderRadius: 12 }}
+                      message="提醒设置已收归系统侧"
+                      description="建议统一使用站内提醒，通过提醒时间、工作日限制和案件提醒期限控制干扰频率。"
+                    />
+                    <Form form={reminderForm} layout="vertical" onFinish={saveReminderSettings} initialValues={initialReminderSettings}>
+                      <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name="reminderTime"
+                            label="提醒时间"
+                            rules={[{ required: true, message: '请选择提醒时间' }]}
+                          >
+                            <Select placeholder="请选择提醒时间">
+                              <Option value="15min">提前15分钟</Option>
+                              <Option value="30min">提前30分钟</Option>
+                              <Option value="1h">提前1小时</Option>
+                              <Option value="2h">提前2小时</Option>
+                              <Option value="1d">提前1天</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name={['notificationChannels', 'system']}
+                            label="站内提醒"
+                            valuePropName="checked"
+                          >
+                            <Switch checkedChildren="开启" unCheckedChildren="关闭" disabled />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name="workdayOnly"
+                            label="仅工作日提醒"
+                            valuePropName="checked"
+                          >
+                            <Switch checkedChildren="是" unCheckedChildren="否" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Form.Item
+                        name="caseReminderDays"
+                        label="案件提醒期限（天）"
+                        rules={[{ required: true, message: '请选择案件提醒期限' }]}
+                      >
+                        <Select style={{ width: '100%', maxWidth: 280 }} placeholder="请选择案件提醒期限">
+                          <Option value={7}>7天</Option>
+                          <Option value={10}>10天</Option>
+                          <Option value={15}>15天</Option>
+                          <Option value={20}>20天</Option>
+                          <Option value={30}>30天</Option>
+                        </Select>
+                      </Form.Item>
+                      <Button type="primary" htmlType="submit" loading={reminderLoading} size="large" style={{ borderRadius: 10 }}>
+                        保存系统提醒
+                      </Button>
+                    </Form>
+                  </Space>
+                </Card>
+              )
+            },
+            {
+              key: 'duty',
+              label: (
+                <Space size={8}>
+                  <TeamOutlined />
+                  <span>值班管理</span>
+                </Space>
+              ),
+              children: (
+                <Card bordered={false} style={{ background: '#fafcff', borderRadius: 16 }}>
+                  <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>值班调解员配置</Title>
+                      <Text type="secondary">设置当前值班调解员，确保案件申请和咨询流转能自动匹配到正确的受理人。</Text>
+                    </div>
+                    <Alert
+                      type={onDutyMediator ? 'success' : 'warning'}
+                      showIcon
+                      style={{ borderRadius: 12 }}
+                      message={onDutyMediator ? `当前值班调解员：${onDutyMediator.name}` : '当前无值班调解员'}
+                      description={onDutyMediator ? `${onDutyMediator.phone || '未留联系电话'}` : '建议尽快设置，避免新案件和咨询无法自动分流。'}
+                    />
+                    <Form form={form} layout="vertical" onFinish={handleSetOnDutyMediator}>
+                      <Form.Item
+                        name="onDutyMediator"
+                        label="当日值班调解员"
+                        rules={[{ required: true, message: '请选择值班调解员' }]}
+                      >
+                        <Select placeholder="请选择值班调解员" loading={mediatorLoading}>
+                          {mediators.map((mediator) => (
+                            <Option key={mediator._id} value={mediator._id}>
+                              {mediator.name} ({mediator.phone})
+                            </Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                      <Button type="primary" htmlType="submit" loading={mediatorLoading} size="large" style={{ borderRadius: 10 }}>
+                        设置值班调解员
+                      </Button>
+                    </Form>
+                  </Space>
+                </Card>
+              )
+            },
+            {
+              key: 'apiKeys',
+              label: (
+                <Space size={8}>
+                  <ApiOutlined />
+                  <span>平台密钥</span>
+                </Space>
+              ),
+              children: (
+                <Card bordered={false} style={{ background: '#fafcff', borderRadius: 16 }}>
+                  <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>第三方平台密钥</Title>
+                      <Text type="secondary">用于统一维护腾讯云与阿里云相关服务的访问凭证，建议修改后立即做连通性验证。</Text>
+                    </div>
+                    <Form form={form} layout="vertical" onFinish={saveSettings}>
+                      <Divider orientation="left" plain>腾讯云</Divider>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['apiKeys', 'tencent', 'secretId']} label="Secret ID">
+                            <Input placeholder="请输入腾讯云 Secret ID" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['apiKeys', 'tencent', 'secretKey']} label="Secret Key">
+                            <Input.Password placeholder="请输入腾讯云 Secret Key" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Divider orientation="left" plain>阿里云</Divider>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['apiKeys', 'aliyun', 'accessKeyId']} label="Access Key ID">
+                            <Input placeholder="请输入阿里云 Access Key ID" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item name={['apiKeys', 'aliyun', 'accessKeySecret']} label="Access Key Secret">
+                            <Input.Password placeholder="请输入阿里云 Access Key Secret" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} size="large" style={{ borderRadius: 10 }}>
+                        保存平台密钥
+                      </Button>
+                    </Form>
+                  </Space>
+                </Card>
+              )
+            }
+          ]}
+        />
+      </Card>
     </div>
   );
 };

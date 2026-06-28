@@ -1,0 +1,54 @@
+.agreement-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding: 32rpx 24rpx 48rpx;
+  box-sizing: border-box;
+}
+
+.agreement-card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 36rpx 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+}
+
+.agreement-title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.agreement-intro {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.agreement-section {
+  margin-top: 28rpx;
+}
+
+.agreement-section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 12rpx;
+}
+
+.agreement-section-content {
+  font-size: 27rpx;
+  line-height: 1.9;
+  color: #475569;
+}
+
+.agreement-btn {
+  margin-top: 36rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, #1890ff 0%, #096dd9 100%);
+  color: #fff;
+}
+
+.agreement-btn::after {
+  border: none;
+}

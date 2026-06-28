@@ -1,0 +1,13 @@
+<view class="agreement-page">
+  <view class="agreement-card">
+    <view class="agreement-title">{{title}}</view>
+    <view class="agreement-intro">请在充分阅读后，再自行决定是否同意并继续登录授权。</view>
+
+    <view wx:for="{{sections}}" wx:key="title" class="agreement-section">
+      <view class="agreement-section-title">{{item.title}}</view>
+      <view class="agreement-section-content">{{item.content}}</view>
+    </view>
+
+    <button class="agreement-btn" bindtap="goBack">我已阅读，返回上一页</button>
+  </view>
+</view>

@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { login, register, getMe, refreshToken, getUsers, updateUser, deleteUser, verifyRegisterToken, wechatLogin, getWechatWebLoginUrl, wechatWebCallback, pollWechatWebToken } from './controller';
+import { login, register, createManagedUser, getMe, refreshToken, getUsers, updateUser, deleteUser, verifyRegisterToken, wechatLogin, getWechatWebLoginUrl, wechatWebCallback, pollWechatWebToken, updateProfile, uploadAvatar, bindWechatPhone, sendSmsCode, bindPhoneBySms } from './controller';
 import { auth, roleAuth } from '../middleware/auth';
 
 const router = express.Router();
@@ -72,6 +72,11 @@ const router = express.Router();
 router.post('/login', login);
 
 router.post('/wechat-login', wechatLogin);
+router.post('/wechat-phone', bindWechatPhone);
+router.post('/sms/send-code', sendSmsCode);
+router.post('/sms/bind-phone', bindPhoneBySms);
+router.put('/profile', updateProfile);
+router.post('/avatar', uploadAvatar);
 // 【PC 管理端】获取扫码登录 URL
 router.get('/wechat-web-login-url', getWechatWebLoginUrl);
 // 【PC 管理端】微信扫码回调
@@ -274,7 +279,8 @@ router.post('/verify-token', verifyRegisterToken);
  *       500: 
  *         description: 服务器内部错误
  */
-router.get('/users', auth, roleAuth(['admin']), getUsers);
+router.get('/users', auth, roleAuth(['superadmin', 'tenant_admin']), getUsers);
+router.post('/users', auth, roleAuth(['superadmin', 'tenant_admin']), createManagedUser);
 
 /**
  * @swagger
@@ -340,7 +346,7 @@ router.get('/users', auth, roleAuth(['admin']), getUsers);
  *       500: 
  *         description: 服务器内部错误
  */
-router.put('/users/:id', auth, roleAuth(['admin']), updateUser);
+router.put('/users/:id', auth, roleAuth(['superadmin', 'tenant_admin']), updateUser);
 
 /**
  * @swagger
@@ -369,6 +375,6 @@ router.put('/users/:id', auth, roleAuth(['admin']), updateUser);
  *       500: 
  *         description: 服务器内部错误
  */
-router.delete('/users/:id', auth, roleAuth(['admin']), deleteUser);
+router.delete('/users/:id', auth, roleAuth(['superadmin', 'tenant_admin']), deleteUser);
 
 export default router;

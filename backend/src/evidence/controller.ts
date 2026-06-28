@@ -16,6 +16,11 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const broadcastUploadDir = path.join(__dirname, '../../public/uploads/broadcasts');
+if (!fs.existsSync(broadcastUploadDir)) {
+  fs.mkdirSync(broadcastUploadDir, { recursive: true });
+}
+
 // 配置multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -74,6 +79,23 @@ export const uploadEvidence = [
       
       // 解析案件ID
       caseId = await resolveCaseId(caseId);
+
+      if (caseId === 'broadcast') {
+        const ext = path.extname(req.file.originalname || '');
+        const finalName = `broadcast_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`;
+        const finalPath = path.join(broadcastUploadDir, finalName);
+        fs.renameSync(req.file.path, finalPath);
+
+        return res.status(201).json({
+          success: true,
+          file: {
+            name: req.file.originalname,
+            path: `/laodongzhongcai/uploads/broadcasts/${finalName}`,
+            url: `/laodongzhongcai/uploads/broadcasts/${finalName}`,
+            size: req.file.size
+          }
+        });
+      }
 
       // 确定文件类型
       const ext = path.extname(req.file.originalname).toLowerCase();

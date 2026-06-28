@@ -50,12 +50,13 @@
   },
   "compileType": "miniprogram",
   "libVersion": "2.30.0",
-  "appid": "wx7215469af5253ac5",
+  "appid": "wxc516dfac2ee4f72c",
   "projectname": "laodongzhongcai-miniprogram",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
   },
-  "simulatorPluginLibVersion": {}
+  "simulatorPluginLibVersion": {},
+  "isGameTourist": false
 }

@@ -1,27 +1,14 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import config from '../config';
-
-const execAsync = promisify(exec);
+import { backupDatabaseToFile, exportSchemaFile } from './service';
+import { writeOperationLog } from '../utils/audit';
 
 // 导出表结构
 const exportSchema = async (req: Request, res: Response) => {
   try {
-    const backupDir = path.join(__dirname, '../../backups/schemas');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-
-    const backupFile = path.join(backupDir, `schema_${new Date().toISOString().slice(0, 10)}.sql`);
-    
-    const { MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE } = process.env;
-    
-    const command = `mysqldump -h ${MYSQL_HOST} -P ${MYSQL_PORT} -u ${MYSQL_USER} -p${MYSQL_PASSWORD} --no-data ${MYSQL_DATABASE} > ${backupFile}`;
-    
-    await execAsync(command);
+    const backupFile = await exportSchemaFile();
 
     res.json({
       success: true,
@@ -58,30 +45,33 @@ const syncSchema = async (req: Request, res: Response) => {
 // 备份数据库
 const backupDatabase = async (req: Request, res: Response) => {
   try {
-    const backupDir = path.join(__dirname, '../../backups/data');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-
-    const backupFile = path.join(backupDir, `backup_${new Date().toISOString().slice(0, 10)}_${Date.now()}.sql.gz`);
-
-    const { MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE } = process.env;
-    
-    const command = `mysqldump -h ${MYSQL_HOST} -P ${MYSQL_PORT} -u ${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} | gzip > ${backupFile}`;
-    
-    await execAsync(command);
-
-    const stats = fs.statSync(backupFile);
-    const fileSize = (stats.size / (1024 * 1024)).toFixed(2);
+    const { backupFile, fileSize } = await backupDatabaseToFile();
+    await writeOperationLog({
+      req,
+      module: 'backup',
+      action: 'backup_database',
+      targetType: 'database',
+      targetDisplay: path.basename(backupFile),
+      result: 'success',
+      detail: `数据库备份成功，文件大小 ${fileSize}`
+    });
 
     res.json({
       success: true,
       message: '数据库备份成功',
-      backupFile: backupFile,
-      fileSize: `${fileSize} MB`
+      backupFile,
+      fileSize
     });
   } catch (error) {
     console.error('备份数据库失败:', error);
+    await writeOperationLog({
+      req,
+      module: 'backup',
+      action: 'backup_database',
+      targetType: 'database',
+      result: 'failed',
+      errorMessage: (error as any).message || '数据库备份失败'
+    });
     res.status(500).json({
       success: false,
       message: '备份数据库失败',

@@ -2,12 +2,37 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import messageRepository from '../repositories/messageRepository';
 import userRepository from '../repositories/userRepository';
+import { caseRepository, visitorRecordRepository } from '../repositories';
 import { io } from '../server';
 
 // 创建消息
 export const createMessage = async (req: express.Request, res: express.Response) => {
   try {
-    const { content, type, recipientId, caseId } = req.body;
+    const { content, type, recipientId: rawRecipientId, caseId } = req.body;
+    let recipientId = rawRecipientId;
+
+    if (!recipientId && caseId) {
+      let caseData = await caseRepository.findById(caseId);
+      if (!caseData) {
+        caseData = await caseRepository.findByCaseNumber(caseId);
+      }
+
+      if (caseData && caseData.mediatorId) {
+        recipientId = caseData.mediatorId;
+      } else {
+        let visitorRecord = await visitorRecordRepository.findById(caseId);
+        if (!visitorRecord) {
+          visitorRecord = await visitorRecordRepository.findByRegisterNumber(caseId);
+        }
+        if (visitorRecord && visitorRecord.mediatorId) {
+          recipientId = visitorRecord.mediatorId;
+        }
+      }
+    }
+
+    if (!recipientId) {
+      return res.status(400).json({ message: '未找到可接收留言的调解员' });
+    }
     
     // 验证接收者是否存在
     const recipient = await userRepository.findById(recipientId);
@@ -21,7 +46,7 @@ export const createMessage = async (req: express.Request, res: express.Response)
       senderId: req.user?.id!,
       receiverId: recipientId,
       content,
-      type,
+      type: type || 'case_message',
       caseId,
       isRead: false,
       createdAt: new Date()
@@ -53,14 +78,27 @@ export const createMessage = async (req: express.Request, res: express.Response)
 export const getUserMessages = async (req: express.Request, res: express.Response) => {
   try {
     const userId = req.user?.id;
-    const { page = 1, limit = 20, type } = req.query;
-    
-    const result = await messageRepository.findByReceiverPaginated(
-      userId!,
-      Number(page),
-      Number(limit),
-      type as string
-    );
+    const userRole = req.user?.role;
+    const { page = 1, limit = 20, type, caseId } = req.query;
+    const result = caseId
+      ? userRole === 'admin'
+        ? await messageRepository.findCaseMessages(
+            caseId as string,
+            Number(page),
+            Number(limit)
+          )
+        : await messageRepository.findCaseMessagesForUser(
+            caseId as string,
+            userId!,
+            Number(page),
+            Number(limit)
+          )
+      : await messageRepository.findByReceiverPaginated(
+          userId!,
+          Number(page),
+          Number(limit),
+          type as string
+        );
     
     res.json({
       messages: result.messages,

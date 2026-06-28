@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Spin, message, Alert, Descriptions, Typography, Space, Tag } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ReloadOutlined, PlayCircleOutlined, PauseCircleOutlined, DatabaseOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { Card, Button, Spin, message, Alert, Descriptions, Typography, Space, Tag, Row, Col, Statistic, Avatar, Empty } from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ReloadOutlined, PlayCircleOutlined, PauseCircleOutlined, EnvironmentOutlined, ApiOutlined } from '@ant-design/icons';
 import api from '../services/api';
+import { PageHero, PageMetricGrid, PageMetricItem, PageShell, PageSectionCard } from '../components/common/PageKit';
 
 const { Title, Text } = Typography;
 
@@ -22,16 +23,23 @@ interface ServicesStatus {
   mongodb?: ServiceStatus;
   mysql?: ServiceStatus;
   frontend: ServiceStatus;
-  sms: ServiceStatus;
-  email: ServiceStatus;
   socket: ServiceStatus;
   environment: ServiceStatus;
+}
+
+interface BackupItem {
+  fileName: string;
+  fileSize: string;
+  createdAt: string;
+  path: string;
 }
 
 const ServiceManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [serviceStatus, setServiceStatus] = useState<ServicesStatus | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backups, setBackups] = useState<BackupItem[]>([]);
 
   // 获取服务状态
   const fetchServiceStatus = async () => {
@@ -83,9 +91,35 @@ const ServiceManagement: React.FC = () => {
     }
   };
 
+  const fetchBackups = async () => {
+    setBackupLoading(true);
+    try {
+      const response = await api.get('/backup/backup-list');
+      setBackups(response.data?.backups || []);
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '获取备份列表失败');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleManualBackup = async () => {
+    setBackupLoading(true);
+    try {
+      const response = await api.post('/backup/backup-database');
+      message.success(response.data?.message || '数据库备份成功');
+      await fetchBackups();
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '数据库备份失败');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   // 组件挂载时获取服务状态
   useEffect(() => {
     fetchServiceStatus();
+    fetchBackups();
   }, []);
 
   // 定时获取服务状态，实现实时监控
@@ -147,31 +181,98 @@ const ServiceManagement: React.FC = () => {
     );
   }
 
+  const serviceStates = serviceStatus ? [
+    serviceStatus.backend.status,
+    serviceStatus.frontend.status,
+    serviceStatus.socket.status,
+    (serviceStatus.mongodb || serviceStatus.mysql)?.status
+  ].filter(Boolean) as string[] : [];
+  const healthyCount = serviceStates.filter((status) => status === 'running' || status === 'connected').length;
+  const warningCount = serviceStates.filter((status) => ['stopped', 'disconnected', 'error'].includes(status)).length;
+
   return (
-    <div style={{ backgroundColor: 'white', padding: 24, borderRadius: 8 }}>
-      <div style={{ 
-        marginBottom: 24, 
-        display: 'flex', 
-        flexDirection: 'column',
-        gap: 12,
-        alignItems: 'flex-start'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <CheckCircleOutlined style={{ fontSize: 20, color: '#1890ff' }} />
-          <Title level={2} style={{ margin: 0, fontSize: '18px', whiteSpace: 'nowrap' }}>服务管理</Title>
-        </div>
-        <Button 
-          type="primary" 
-          icon={<ReloadOutlined />} 
-          onClick={fetchServiceStatus}
-          loading={loading}
-        >
-          刷新状态
-        </Button>
-      </div>
+    <PageShell>
+      <PageHero
+        tone="slate"
+        icon={<ApiOutlined />}
+        title="服务管理台"
+        description="在这里统一查看前端、后端、数据库、Socket 和环境状态。建议先定位异常项，再执行启动、停止或重启操作。"
+        tags={
+          <>
+            <Tag color="blue-inverse" style={{ borderRadius: 999 }}>运行状态可视化</Tag>
+            <Tag color="geekblue-inverse" style={{ borderRadius: 999 }}>环境信息单独展示</Tag>
+            <Tag color="purple-inverse" style={{ borderRadius: 999 }}>数据库每日自动备份</Tag>
+          </>
+        }
+        actions={
+          <Button type="primary" icon={<ReloadOutlined />} onClick={fetchServiceStatus} loading={loading} size="large" style={{ borderRadius: 10 }}>
+            刷新状态
+          </Button>
+        }
+        note={
+          <Alert
+            message="维护提示"
+            description="进行重启前，请先确认当前是否存在活跃用户或关键业务操作。"
+            type="info"
+            showIcon
+          />
+        }
+      />
+
+      <PageMetricGrid>
+        <PageMetricItem><Statistic title="监控对象" value={serviceStates.length} suffix="项" /></PageMetricItem>
+        <PageMetricItem><Statistic title="健康状态" value={healthyCount} suffix="项" /></PageMetricItem>
+        <PageMetricItem><Statistic title="异常状态" value={warningCount} suffix="项" /></PageMetricItem>
+        <PageMetricItem><Statistic title="当前环境" value={serviceStatus?.environment.dbEnv === 'production' ? '生产' : '开发'} /></PageMetricItem>
+      </PageMetricGrid>
+
+      <PageSectionCard
+        title="数据库备份"
+        extra={
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={fetchBackups} loading={backupLoading}>刷新列表</Button>
+            <Button type="primary" icon={<ReloadOutlined />} onClick={handleManualBackup} loading={backupLoading}>立即备份</Button>
+          </Space>
+        }
+      >
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card bordered={false}>
+              <Statistic title="保留策略" value="3 天" />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered={false}>
+              <Statistic title="执行频率" value="每日 02:30" />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered={false}>
+              <Statistic title="当前备份数" value={backups.length} suffix="份" />
+            </Card>
+          </Col>
+        </Row>
+
+        {backups.length > 0 ? (
+          <Card bordered={false}>
+            <Descriptions column={1} title="最近备份文件">
+              {backups.slice(0, 5).map((item) => (
+                <Descriptions.Item key={item.path} label={item.fileName}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <Text>{new Date(item.createdAt).toLocaleString()}</Text>
+                    <Tag color="blue">{item.fileSize}</Tag>
+                  </div>
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
+          </Card>
+        ) : (
+          <Empty description="暂无备份文件" />
+        )}
+      </PageSectionCard>
 
       {serviceStatus ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
           {/*
             兼容：数据库状态
             - 如果有 mongodb 字段，按 MongoDB 展示
@@ -189,8 +290,8 @@ const ServiceManagement: React.FC = () => {
                     {getStatusIcon(dbService.status)}
                   </Space>
                 }
-                bordered={true}
-                style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
+                bordered={false}
+                style={{ boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)', borderRadius: 18 }}
               >
                 <Descriptions column={1}>
                   <Descriptions.Item label="状态">
@@ -225,8 +326,8 @@ const ServiceManagement: React.FC = () => {
                 <EnvironmentOutlined style={{ color: '#1890ff' }} />
               </Space>
             }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)', borderLeft: '4px solid #1890ff' }}
+            bordered={false}
+            style={{ boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)', borderRadius: 18, borderLeft: '4px solid #1890ff' }}
           >
             <Descriptions column={1}>
               <Descriptions.Item label="状态">
@@ -276,8 +377,8 @@ const ServiceManagement: React.FC = () => {
                 {getStatusIcon(serviceStatus.backend.status)}
               </Space>
             }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
+            bordered={false}
+            style={{ boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)', borderRadius: 18 }}
           >
             <Descriptions column={1}>
               <Descriptions.Item label="状态">
@@ -331,8 +432,8 @@ const ServiceManagement: React.FC = () => {
                 {getStatusIcon(serviceStatus.frontend.status)}
               </Space>
             }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
+            bordered={false}
+            style={{ boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)', borderRadius: 18 }}
           >
             <Descriptions column={1}>
               <Descriptions.Item label="状态">
@@ -375,77 +476,6 @@ const ServiceManagement: React.FC = () => {
               </Button>
             </div>
           </Card>
-
-
-
-          {/* 短信服务状态卡片 */}
-          <Card
-            title={
-              <Space>
-                <Text strong>短信服务</Text>
-                {getStatusIcon(serviceStatus.sms.status)}
-              </Space>
-            }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
-          >
-            <Descriptions column={1}>
-              <Descriptions.Item label="状态">
-                <Text style={{ color: getStatusColor(serviceStatus.sms.status) }}>
-                  {getStatusText(serviceStatus.sms.status)}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="消息">
-                <Text>{serviceStatus.sms.message}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="更新时间">
-                <Text>{new Date(serviceStatus.sms.timestamp).toLocaleString()}</Text>
-              </Descriptions.Item>
-            </Descriptions>
-            <div style={{ marginTop: 16 }}>
-              <Alert
-                message="短信服务管理"
-                description="短信服务状态基于配置文件检查，需要更新配置文件以修改服务状态"
-                type="info"
-                showIcon
-              />
-            </div>
-          </Card>
-
-          {/* 邮件服务状态卡片 */}
-          <Card
-            title={
-              <Space>
-                <Text strong>邮件服务</Text>
-                {getStatusIcon(serviceStatus.email.status)}
-              </Space>
-            }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
-          >
-            <Descriptions column={1}>
-              <Descriptions.Item label="状态">
-                <Text style={{ color: getStatusColor(serviceStatus.email.status) }}>
-                  {getStatusText(serviceStatus.email.status)}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="消息">
-                <Text>{serviceStatus.email.message}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="更新时间">
-                <Text>{new Date(serviceStatus.email.timestamp).toLocaleString()}</Text>
-              </Descriptions.Item>
-            </Descriptions>
-            <div style={{ marginTop: 16 }}>
-              <Alert
-                message="邮件服务管理"
-                description="邮件服务状态基于配置文件检查，需要更新配置文件以修改服务状态"
-                type="info"
-                showIcon
-              />
-            </div>
-          </Card>
-
           {/* Socket.IO 服务状态卡片 */}
           <Card
             title={
@@ -454,8 +484,8 @@ const ServiceManagement: React.FC = () => {
                 {getStatusIcon(serviceStatus.socket.status)}
               </Space>
             }
-            bordered={true}
-            style={{ boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)' }}
+            bordered={false}
+            style={{ boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)', borderRadius: 18 }}
           >
             <Descriptions column={1}>
               <Descriptions.Item label="状态">
@@ -481,20 +511,13 @@ const ServiceManagement: React.FC = () => {
           </Card>
         </div>
       ) : (
-        <Alert
-          message="获取服务状态失败"
-          description="请检查网络连接或后端服务是否运行"
-          type="error"
-          showIcon
-          action={
-            <Button size="small" type="primary" onClick={fetchServiceStatus}>
-              重试
-            </Button>
-          }
-          style={{ marginBottom: 24 }}
-        />
+        <PageSectionCard>
+          <Empty description="获取服务状态失败，请检查网络连接或后端服务是否运行">
+            <Button type="primary" onClick={fetchServiceStatus}>重试</Button>
+          </Empty>
+        </PageSectionCard>
       )}
-    </div>
+    </PageShell>
   );
 };
 

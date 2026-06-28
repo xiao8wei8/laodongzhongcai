@@ -6,21 +6,21 @@ import { auth, roleAuth } from '../middleware/auth';
 const router = express.Router();
 
 // 检查服务状态，只允许管理员访问
-router.get('/status', [auth, roleAuth(['admin'])], checkServiceStatus);
+router.get('/status', [auth, roleAuth(['superadmin'])], checkServiceStatus);
 
 // 启动服务，只允许管理员访问
-router.post('/start', [auth, roleAuth(['admin'])], startService);
+router.post('/start', [auth, roleAuth(['superadmin'])], startService);
 
 // 停止服务，只允许管理员访问
-router.post('/stop', [auth, roleAuth(['admin'])], stopService);
+router.post('/stop', [auth, roleAuth(['superadmin'])], stopService);
 
 // 重启服务，只允许管理员访问
-router.post('/restart', [auth, roleAuth(['admin'])], restartService);
+router.post('/restart', [auth, roleAuth(['superadmin'])], restartService);
 
 // 获取监控数据，只允许管理员访问
-router.get('/monitoring', [auth, roleAuth(['admin'])], getMonitoringData);
+router.get('/monitoring', [auth, roleAuth(['superadmin'])], getMonitoringData);
 
 // 获取日志数据，只允许管理员访问
-router.get('/logs', [auth, roleAuth(['admin'])], getLogs);
+router.get('/logs', [auth, roleAuth(['superadmin'])], getLogs);
 
 export default router;

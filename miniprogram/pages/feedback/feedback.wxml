@@ -1,0 +1,61 @@
+<view class="feedback-container">
+  <view wx:if="{{isGuestMode}}" class="empty-state">
+    <view class="empty-state-icon">🔐</view>
+    <view class="empty-state-text">登录后可提交和查看反馈记录</view>
+    <button class="btn-outline btn-sm mt-20" bindtap="goLogin">去登录</button>
+  </view>
+
+  <block wx:else>
+  <view class="card feedback-card">
+    <view class="card-title">提交反馈</view>
+
+    <view class="form-group">
+      <view class="form-label">反馈标题</view>
+      <input class="form-input" placeholder="请简要描述问题或建议" value="{{form.title}}" data-field="title" bindinput="onInput" />
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">反馈类型</view>
+      <picker range="{{typeOptions}}" range-key="label" value="{{currentTypeIndex}}" bindchange="onTypeChange">
+        <view class="picker-display">{{currentTypeLabel}}</view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">反馈内容</view>
+      <textarea class="form-textarea" maxlength="1000" placeholder="请尽量写清楚问题现象、发生步骤或你的建议" value="{{form.content}}" data-field="content" bindinput="onInput" />
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">联系人</view>
+      <input class="form-input" placeholder="选填" value="{{form.contactName}}" data-field="contactName" bindinput="onInput" />
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">联系电话</view>
+      <input class="form-input" placeholder="选填" value="{{form.contactPhone}}" data-field="contactPhone" bindinput="onInput" />
+    </view>
+
+    <button class="submit-btn" bindtap="submitFeedback" loading="{{loading}}">提交反馈</button>
+  </view>
+
+  <view class="card feedback-card">
+    <view class="card-title">我的反馈</view>
+    <block wx:if="{{myFeedbacks.length > 0}}">
+      <view wx:for="{{myFeedbacks}}" wx:key="id" class="feedback-item">
+        <view class="feedback-head">
+          <view class="feedback-title">{{item.title}}</view>
+          <view class="feedback-status status-{{item.status}}">{{item.statusText}}</view>
+        </view>
+        <view class="feedback-meta">{{item.typeText}} · {{item.createTimeText}}</view>
+        <view class="feedback-content">{{item.content}}</view>
+        <view wx:if="{{item.replyContent}}" class="feedback-reply">
+          <view class="feedback-reply-title">处理回复</view>
+          <view class="feedback-reply-content">{{item.replyContent}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty-text">暂无反馈记录</view>
+  </view>
+  </block>
+</view>

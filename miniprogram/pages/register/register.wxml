@@ -32,14 +32,16 @@
       <input class="form-input" type="number" maxlength="11" placeholder="请输入手机号" value="{{form.phone}}" data-field="phone" bindinput="onInput" />
     </view>
 
+    <view class="form-item">
+      <text class="form-label form-label-required">所属街道</text>
+      <picker range="{{tenants}}" range-key="tenantName" value="{{tenantIndex}}" bindchange="onTenantChange">
+        <view class="picker-display">{{tenantLabel}}</view>
+      </picker>
+    </view>
+
     <view wx:if="{{form.role === 'personal'}}" class="form-item">
       <text class="form-label form-label-required">身份证号</text>
       <input class="form-input" placeholder="请输入身份证号" value="{{form.idCard}}" data-field="idCard" bindinput="onInput" />
-    </view>
-
-    <view class="form-item">
-      <text class="form-label">邮箱</text>
-      <input class="form-input" placeholder="选填" value="{{form.email}}" data-field="email" bindinput="onInput" />
     </view>
 
     <view class="form-item">

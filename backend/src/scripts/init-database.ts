@@ -64,6 +64,52 @@ async function initDatabase() {
     try {
       await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS wechat_mp_openid VARCHAR(255) DEFAULT NULL');
       await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS wechat_web_openid VARCHAR(255) DEFAULT NULL');
+      await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname VARCHAR(100) DEFAULT NULL');
+      await connection.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatarUrl VARCHAR(500) DEFAULT NULL');
+      await connection.query('ALTER TABLE cases ADD COLUMN IF NOT EXISTS applicantPhone VARCHAR(50) DEFAULT NULL');
+      await connection.query('ALTER TABLE cases ADD COLUMN IF NOT EXISTS respondentPhone VARCHAR(50) DEFAULT NULL');
+      await connection.query('ALTER TABLE cases ADD COLUMN IF NOT EXISTS applicantDisplayName VARCHAR(100) DEFAULT NULL');
+      await connection.query('ALTER TABLE cases ADD COLUMN IF NOT EXISTS respondentDisplayName VARCHAR(100) DEFAULT NULL');
+      await connection.query('DROP TRIGGER IF EXISTS trg_cases_snapshot_before_insert');
+      await connection.query(`
+        CREATE TRIGGER trg_cases_snapshot_before_insert
+        BEFORE INSERT ON cases
+        FOR EACH ROW
+        BEGIN
+          IF (NEW.applicantDisplayName IS NULL OR NEW.applicantDisplayName = '') THEN
+            SET NEW.applicantDisplayName = (SELECT name FROM users WHERE id = NEW.applicantId LIMIT 1);
+          END IF;
+          IF (NEW.respondentDisplayName IS NULL OR NEW.respondentDisplayName = '') THEN
+            SET NEW.respondentDisplayName = (SELECT name FROM users WHERE id = NEW.respondentId LIMIT 1);
+          END IF;
+          IF (NEW.applicantPhone IS NULL OR NEW.applicantPhone = '') THEN
+            SET NEW.applicantPhone = (SELECT phone FROM users WHERE id = NEW.applicantId LIMIT 1);
+          END IF;
+          IF (NEW.respondentPhone IS NULL OR NEW.respondentPhone = '') THEN
+            SET NEW.respondentPhone = (SELECT phone FROM users WHERE id = NEW.respondentId LIMIT 1);
+          END IF;
+        END
+      `);
+      await connection.query('DROP TRIGGER IF EXISTS trg_cases_snapshot_before_update');
+      await connection.query(`
+        CREATE TRIGGER trg_cases_snapshot_before_update
+        BEFORE UPDATE ON cases
+        FOR EACH ROW
+        BEGIN
+          IF (NEW.applicantDisplayName IS NULL OR NEW.applicantDisplayName = '') THEN
+            SET NEW.applicantDisplayName = COALESCE((SELECT name FROM users WHERE id = NEW.applicantId LIMIT 1), OLD.applicantDisplayName);
+          END IF;
+          IF (NEW.respondentDisplayName IS NULL OR NEW.respondentDisplayName = '') THEN
+            SET NEW.respondentDisplayName = COALESCE((SELECT name FROM users WHERE id = NEW.respondentId LIMIT 1), OLD.respondentDisplayName);
+          END IF;
+          IF (NEW.applicantPhone IS NULL OR NEW.applicantPhone = '') THEN
+            SET NEW.applicantPhone = COALESCE((SELECT phone FROM users WHERE id = NEW.applicantId LIMIT 1), OLD.applicantPhone);
+          END IF;
+          IF (NEW.respondentPhone IS NULL OR NEW.respondentPhone = '') THEN
+            SET NEW.respondentPhone = COALESCE((SELECT phone FROM users WHERE id = NEW.respondentId LIMIT 1), OLD.respondentPhone);
+          END IF;
+        END
+      `);
       await connection.query('CREATE INDEX IF NOT EXISTS idx_users_wechat_mp_openid ON users (wechat_mp_openid)');
       await connection.query('CREATE INDEX IF NOT EXISTS idx_users_wechat_web_openid ON users (wechat_web_openid)');
       console.log('✅ 微信 openid 字段准备就绪！\n');

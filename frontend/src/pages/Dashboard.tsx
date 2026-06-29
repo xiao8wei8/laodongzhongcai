@@ -66,6 +66,10 @@ interface Notification {
   }[];
 }
 
+const buildCaseQueryLink = (caseNumber?: string) => (
+  caseNumber ? `/case-query?keyword=${encodeURIComponent(caseNumber)}` : '/case-query'
+);
+
 const normalizeNotifications = (payload: Partial<Notification> | null | undefined): Notification => ({
   overdueCases: Array.isArray(payload?.overdueCases) ? payload!.overdueCases : [],
   todaySchedule: Array.isArray(payload?.todaySchedule) ? payload!.todaySchedule : [],
@@ -504,7 +508,11 @@ const Dashboard: React.FC = () => {
                         <span style={{ fontWeight: 700, fontSize: 14 }}>案件 {caseItem.caseNumber}</span>
                       </div>
                       <p style={{ margin: 0, fontSize: 12, color: '#666', lineHeight: 1.7 }}>{caseItem.message}</p>
-                      <Button type="primary" size="small" style={{ marginTop: 10, borderRadius: 999 }} icon={<RightOutlined />}>{caseItem.action}</Button>
+                      <Link to={buildCaseQueryLink(caseItem.caseNumber)}>
+                        <Button type="primary" size="small" style={{ marginTop: 10, borderRadius: 999 }} icon={<RightOutlined />}>
+                          {caseItem.action}
+                        </Button>
+                      </Link>
                     </div>
                   )),
                   '暂无即将超期案件'

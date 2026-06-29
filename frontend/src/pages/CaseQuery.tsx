@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Table, Input, Button, message, Typography, Tag, Space, Select, Card, Row, Col, Statistic, Avatar, Alert } from 'antd';
 import { SearchOutlined, FileSearchOutlined, PhoneOutlined, EnvironmentOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 import { ExportButton, PageHero, PageSectionCard, PageShell, PageToolbar } from '../components/common/PageKit';
@@ -60,10 +60,12 @@ const getStatusMeta = (status?: string) => {
 };
 
 const CaseQuery: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keywordFromSearchParams = searchParams.get('keyword') || '';
   const [cases, setCases] = useState<Case[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [keyword, setKeyword] = useState('');
+  const [keyword, setKeyword] = useState(keywordFromSearchParams);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [tenantFilter, setTenantFilter] = useState<string>('all');
@@ -98,11 +100,17 @@ const CaseQuery: React.FC = () => {
   }, [keyword]);
 
   useEffect(() => {
+    setKeyword(keywordFromSearchParams);
+  }, [keywordFromSearchParams]);
+
+  useEffect(() => {
     fetchTenants();
   }, []);
 
   const handleSearch = (value: string) => {
     setKeyword(value);
+    const trimmedValue = value.trim();
+    setSearchParams(trimmedValue ? { keyword: trimmedValue } : {});
   };
 
   const filteredCases = useMemo(() => {
@@ -363,6 +371,8 @@ const CaseQuery: React.FC = () => {
               placeholder="按案件编号、申请人、被申请人、街道或进展内容搜索"
               allowClear
               enterButton={<SearchOutlined />}
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
               onSearch={handleSearch}
               style={{ width: '100%', marginTop: 8 }}
             />

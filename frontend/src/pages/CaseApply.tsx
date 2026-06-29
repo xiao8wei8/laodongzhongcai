@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, Steps, Form, Input, Select, Button, message, Upload, Alert, Typography, Space, Tag, Row, Col, Statistic, Avatar } from 'antd';
+import { Card, Steps, Form, Input, Select, Button, message, Upload, Alert, Typography, Space, Tag, Row, Col, Statistic, Avatar, Modal } from 'antd';
 import { SaveOutlined, UploadOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import useAuthStore from '../store/authStore';
 import { PageHero, PageSectionCard, PageShell } from '../components/common/PageKit';
+import type { UploadFile } from 'antd/es/upload/interface';
 
 const { Step } = Steps;
 const { Option } = Select;
@@ -12,17 +13,49 @@ const { TextArea } = Input;
 const { Dragger } = Upload;
 const { Text } = Typography;
 
+interface TenantOption {
+  id: string;
+  tenantName: string;
+}
+
+const isImageFile = (file: UploadFile) => {
+  const fileType = file.type || '';
+  const fileName = String(file.name || '').toLowerCase();
+  return fileType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fileName);
+};
+
+const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = reject;
+});
+
 const CaseApply: React.FC = () => {
   const [current, setCurrent] = useState(0);
   const [form] = Form.useForm();
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [evidenceFiles, setEvidenceFiles] = useState<any[]>([]);
+  const [evidenceFiles, setEvidenceFiles] = useState<UploadFile[]>([]);
+  const [tenants, setTenants] = useState<TenantOption[]>([]);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewImage, setPreviewImage] = useState('');
   const navigate = useNavigate();
   const { isAuthenticated, userInfo } = useAuthStore();
-  const [loading, setLoading] = useState(false);
   
   // 使用state保存所有表单数据
   const [formData, setFormData] = useState<any>({});
+
+  const isSuperAdmin = !!userInfo?.isSuperAdmin || userInfo?.role === 'superadmin';
+
+  const fetchTenants = async () => {
+    try {
+      const response = await api.get('/tenant');
+      setTenants(response.data.tenants || []);
+    } catch (_error) {
+      setTenants([]);
+    }
+  };
 
   // 组件挂载时，如果用户已登录，自动填充申请人信息
   useEffect(() => {
@@ -30,12 +63,17 @@ const CaseApply: React.FC = () => {
       const initialData = {
         applicantName: userInfo.name || '',
         applicantPhone: userInfo.phone || '',
-        applicantIdCard: userInfo.idCard || ''
+        applicantIdCard: (userInfo as any).idCard || '',
+        tenantId: userInfo.tenantId || undefined
       };
       setFormData(initialData);
       form.setFieldsValue(initialData);
     }
   }, [isAuthenticated, userInfo, form]);
+
+  useEffect(() => {
+    fetchTenants();
+  }, []);
 
   // 步骤
   const steps = [
@@ -103,6 +141,7 @@ const CaseApply: React.FC = () => {
           idCard: formData.respondentIdCard,
           type: formData.respondentType
         },
+        tenantId: formData.tenantId,
         disputeType: formData.disputeType,
         caseAmount: formData.caseAmount,
         requestItems: formData.requestItems,
@@ -126,21 +165,46 @@ const CaseApply: React.FC = () => {
     } catch (error: any) {
       console.error('提交申请失败:', error);
       console.error('错误详情:', error.response?.data);
-      message.error('登记提交失败');
+      message.error(error.response?.data?.message || '登记提交失败');
     } finally {
       setSubmitLoading(false);
     }
   };
 
   // 处理文件上传
-  const handleUpload = (file: any) => {
-    setEvidenceFiles([...evidenceFiles, file]);
+  const handleUpload = (file: UploadFile) => {
+    setEvidenceFiles((prev) => [...prev, file]);
     return false; // 阻止自动上传
   };
 
   // 移除文件
-  const handleRemove = (file: any) => {
-    setEvidenceFiles(evidenceFiles.filter(item => item.uid !== file.uid));
+  const handleRemove = (file: UploadFile) => {
+    setEvidenceFiles((prev) => prev.filter(item => item.uid !== file.uid));
+  };
+
+  const handlePreview = async (file: UploadFile) => {
+    if (isImageFile(file)) {
+      let previewUrl = file.url || '';
+      if (!previewUrl && typeof file.thumbUrl === 'string') {
+        previewUrl = file.thumbUrl;
+      }
+      if (!previewUrl && file.originFileObj) {
+        previewUrl = await fileToDataUrl(file.originFileObj as File);
+      }
+      if (previewUrl) {
+        setPreviewImage(previewUrl);
+        setPreviewTitle(file.name || '图片预览');
+        setPreviewVisible(true);
+        return;
+      }
+    }
+
+    if (file.originFileObj) {
+      const objectUrl = URL.createObjectURL(file.originFileObj as File);
+      window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    message.info('当前文件暂不支持预览');
   };
 
   // 渲染步骤内容
@@ -213,6 +277,25 @@ const CaseApply: React.FC = () => {
         return (
           <>
             <Form.Item
+              name="tenantId"
+              label="受理街道"
+              rules={[{ required: true, message: '请选择受理街道' }]}
+              extra={isSuperAdmin ? '请选择本次登记要归属的街道。' : '默认使用当前账号所属街道。'}
+            >
+              <Select
+                placeholder="请选择受理街道"
+                disabled={!isSuperAdmin && !!userInfo?.tenantId}
+                showSearch
+                optionFilterProp="children"
+              >
+                {tenants.map((tenant) => (
+                  <Option key={tenant.id} value={tenant.id}>
+                    {tenant.tenantName}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item
               name="disputeType"
               label="争议类型"
               rules={[{ required: true, message: '请选择争议类型' }]}
@@ -262,6 +345,7 @@ const CaseApply: React.FC = () => {
                 multiple
                 beforeUpload={handleUpload}
                 onRemove={handleRemove}
+                onPreview={handlePreview}
                 fileList={evidenceFiles}
                 listType="picture"
               >
@@ -282,6 +366,7 @@ const CaseApply: React.FC = () => {
             <p>请确认以下信息是否正确：</p>
             <p><strong>申请人：</strong>{form.getFieldValue('applicantName')} ({form.getFieldValue('applicantPhone')})</p>
             <p><strong>被申请人：</strong>{form.getFieldValue('respondentName')} ({form.getFieldValue('respondentPhone')})</p>
+            <p><strong>受理街道：</strong>{tenants.find(item => item.id === form.getFieldValue('tenantId'))?.tenantName || userInfo?.tenantName || '未选择'}</p>
             <p><strong>争议类型：</strong>{form.getFieldValue('disputeType')}</p>
             <p><strong>涉案金额：</strong>¥{form.getFieldValue('caseAmount')}</p>
             <p><strong>请求事项：</strong>{form.getFieldValue('requestItems')}</p>
@@ -395,6 +480,9 @@ const CaseApply: React.FC = () => {
           </PageSectionCard>
         </div>
       )}
+      <Modal open={previewVisible} title={previewTitle} footer={null} onCancel={() => setPreviewVisible(false)} width={720}>
+        <img src={previewImage} alt={previewTitle} style={{ width: '100%' }} />
+      </Modal>
     </PageShell>
   );
 };

@@ -154,7 +154,7 @@ const getPendingCasesData = async (userId: string | undefined, role: string | un
 const getNotificationsData = async (userId: string | undefined, role: string | undefined, tenantId?: string | null) => {
   try {
     const notifications = {
-      overdueCases: [] as { caseNumber: string; days: number; message: string; action: string }[],
+      overdueCases: [] as { caseId?: string; caseNumber: string; days: number; message: string; action: string; recordType?: 'case' | 'visitor' }[],
       todaySchedule: [] as { time: string; title: string }[],
       todayConsultations: [] as { time: string; title: string; source: string }[],
       systemNotifications: [] as { title: string; message: string }[]
@@ -169,10 +169,12 @@ const getNotificationsData = async (userId: string | undefined, role: string | u
       overdueCases.forEach(caseObj => {
         const daysSinceCreated = Math.floor((today.getTime() - new Date(caseObj.createdAt).getTime()) / (1000 * 60 * 60 * 24));
         notifications.overdueCases.push({
+          caseId: caseObj.id,
           caseNumber: caseObj.caseNumber,
           days: daysSinceCreated,
           message: `已受理${daysSinceCreated}天，需确认双方调解意向`,
-          action: '立即处理'
+          action: '立即处理',
+          recordType: 'case'
         });
       });
       
@@ -184,7 +186,8 @@ const getNotificationsData = async (userId: string | undefined, role: string | u
           caseNumber: visitor.registerNumber,
           days: daysSinceCreated,
           message: `已登记${daysSinceCreated}天，需确认调解意向`,
-          action: '立即处理'
+          action: '立即处理',
+          recordType: 'visitor'
         });
       });
 
